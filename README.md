@@ -31,4 +31,8 @@ We got baxter working! Woohoo! Now let's set him up for development.
 
 10) Fun example command: `rosrun baxter_examples joint_velocity_wobbler.py`
 
+#### Example C++ code (per Wyatt Newman)
+In the sub-package wsn_test_baxter_cmd, see the sample C++ code and the README for how to execute 
+C++ based arm motion control.
+
 
