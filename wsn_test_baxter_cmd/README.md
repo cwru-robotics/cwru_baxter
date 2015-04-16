@@ -25,10 +25,14 @@ still need to learn how to enable Baxter from within C++.  Present work-around i
 
 rosrun baxter_examples joint_position_keyboard.py
 
+better: `rosrun baxter_tools enable_robot.py -e`
+
 This code enables the joints for position control, then waits for keyboard input.  Simply shrink this window 
 (keeping it alive), then run the demo C++ node:
 
 rosrun wsn_test_baxter_cmd wsn_test_baxter_cmd_node
 
 Baxter will waive his arms wildly.  
+
+
 

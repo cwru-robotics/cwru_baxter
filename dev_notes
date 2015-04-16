@@ -1,0 +1,50 @@
+mantis_pose:
+name: ['head_nod', 'head_pan', 'left_e0', 'left_e1', 'left_s0', 'left_s1', 'left_w0', 'left_w1', 'left_w2', 'right_e0', 'right_e1', 'right_s0', 'right_s1', 'right_w0', 'right_w1', 'right_w2', 'torso_t0']
+position: [0.0, -0.015339807861328126, 
+0.18292720874633792, -0.050237870745849615, 0.5832961939270019, -1.291228326727295, -0.9203884716796875, 1.2352380280334474, -0.2672961519836426, 
+-1.2701360909179689, 0.1468786602722168, 0.22626216595458987, -1.2011069555419922, -2.741607160015869, -0.8655486585754395, 2.9421751478027347, 
+-12.565987104803467]
+
+simplified: (in order s0, s1, e0, e1, w0, w1, w2)
+left:  0.58, -1.29, 0.18, -0.05,  -0.92, 1.23, 0, 
+
+right: 0.23, -1.20, -1.27, 0.14,  -2.74, -0.87, 0,
+
+
+
+
+torso_t0: -12
+
+/robot/joint_states
+
+see: https://github.com/RethinkRobotics/sdk-docs/wiki/API-Reference
+
+display:
+rosrun baxter_examples xdisplay_image.py --file=yikes.jpg  (in wsn_test_baxter_cmd directory)
+
+/robot/limb/right/command_joint_position
+/robot/limb/left/joint_command
+/robot/limb/left/command_joint_position
+
+
+/robot/head/command_head_nod
+  	Type: std_msgs/Bool
+ (this is a binary command, which causes the head to nod once)
+rostopic pub /robot/head/command_head_nod std_msgs/Bool True
+
+/robot/head/command_head_pan
+ 	baxter_core_msgs/HeadPanCommand
+		float32 target
+		int32 speed
+e.g., to send the head to "0" (forward) angle:
+rostopic pub /robot/head/command_head_pan baxter_core_msgs/HeadPanCommand -- 0.0 100
+
+/robot/head/head_state
+	baxter_core_msgs/HeadState
+		float32 pan
+		bool isPanning
+		bool isNodding
+
+
+rosrun baxter_tools enable_robot.py -e
+
