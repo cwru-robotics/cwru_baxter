@@ -32,7 +32,13 @@ This code enables the joints for position control, then waits for keyboard input
 
 rosrun wsn_test_baxter_cmd wsn_test_baxter_cmd_node
 
-Baxter will waive his arms wildly.  
+Baxter will waive his arms wildly. 
+
+DEMO ON BAXTER:  this simple program sends Baxter to a pre-defined pose; worked on physical arms
+ from ros_ws: `./baxter.sh`
+`rosrun baxter_tools enable_robot.py -e`
+`rosrun wsn_test_baxter_cmd wsn_test_baxter_cmd2`
+
 
 
 
