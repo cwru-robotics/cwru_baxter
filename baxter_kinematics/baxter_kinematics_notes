@@ -1,0 +1,93 @@
+baxter kinematics notes:
+at home pose, arms are outstretched, w/ 90-deg included angle.
+
+from home pose, elbow-bend axis is "lower" (less z) than humerus rotation axis;
+ positive elbow bend corresponds to lowering hand;
+ elbow can bend positive, but not (or hardly) negative
+
+kin dev notes:  fwd kin:
+  fwd_kin code agrees with tf for shoulder point and elbow point, at home pose, w/rt right_upper_shoulder frame
+  (w/ const double DH_q_offset2 = M_PI/2.0;)
+
+elbow point is origin of right_lower_elbow frame;
+wrist point is origin of right_lower_forearm frame;
+
+NEED TO FIX: right_arm_mount is stationary, but right_upper_shoulder moves with S0;
+ALSO, find transform from torso to right_arm_mount (static)
+tf: right_upper_shoulder w/rt right_arm_mount: x,y, z = 0.055695, 0.000000, 0.011038
+tf: right_arm_mount w/rt torso: x,y, z = 0.024645, -0.219645, 0.118588
+
+---5/27: added correction for right-arm mount frame; got agreement w/ fwd_kin of right arm
+   and tf w/rt "right_arm_mount" frame
+
+---start IK (right arm)---
+  for redundancy, use fnc for which specify q0, then find N solns for q1 through q6
+   Do NOT expect elbow-up vs elbow-down solns (elbow bends one way); only allow positive elbow angles
+
+  sub-soln: express desired wrist-point coords w/rt 1-frame
+            find soln q1, q2, q3 that positions the wrist point
+	    use APPROX model, since  DH_a5=0.01; (ignore this offset from forearm axis to wrist point)
+            then iterate w/ J for exact solns
+
+w_w/rt arm mount from IK:  0.303178  0.542953 -0.150389
+tf: wrist x,y, z = 0.303188, 0.542965, -0.150332
+
+fwd kin shoulder point: 0.0929757, 0.0580616, 0.281338
+ tf: shoulder x,y, z = 0.092976, 0.058062, 0.281388
+
+if set q(1)=0, transforms work (for all values of q(i) except q(1)!=0).
+explanation:  URDF frame right_lower_shoulder ROTATES qith q(1).  oops
+
+------------- solving for elbow angle------------
+There is an IK singularity for elbow angles less than +0.22; (r_goal> 0.745)
+ because of elbow-joint offset, can have 2 reachable solutions for r_goal> 0.745
+ approx as: rqr r_goal< 0.745, --> q_elbow > 0.24
+ choose the first elbow solution (q>0.24)
+
+----5/28: MIGHT have q_s1, q_humerus, q_elbow IK working;
+   need to test, and need to look for multiple solutions.
+   I think there is only 1 valid q_elbow and (given q_elbow, q_humerus) only 1 valid q_s1;
+   BUT...looks like there are 2 q_humerus solutions (and corresponding q_s1 solns)
+   So...3DOF sys has 2 valid solns?  
+
+---5/29: wrote compute_q123_solns()
+  seems to be correct (within spherical-wrist approx)
+  next, write 3DOF Jacobian to take approx soln to exact
+
+--wrote get_wrist_Jacobian_3x3()
+  computes influence of q_s1, q_humerus, q_elbow on wrist point, expressed in frame1 coords
+  seems to be working (wrote test main)
+
+-- added soln for spherical wrist--looks pretty good; needs more testing
+
+--next, write code for sampling of q_s0, and get list of all 7-DOF solns
+
+....did search over q_s0; found approx q_s0_ctr; searched dq_s0 to max, then dq_s0 to min;
+   (only for q0 through q4 for wrist pt);
+   commanded these to robot to visualize--looks OK
+   still need to combine with wrist solns, and to list ALL solns in a vector (then plan motion through options)
+   tried testing wrist solns--needs fixing
+
+--wrote fnc: 
+/major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
+// for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
+int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns)
+
+tested this w/ test_main3; commands each of the solns;
+  got ~100 solns w/ dqs0= 0.05 (all for the same desired tool pose)
+
+--wrote fnc:
+//function to find precise values of joint angles q1, q2, q3 to match desired wrist position, implied by desired_hand_pose
+//provide q123_approx; this function will take q_s0 and q_forearm as specified, and q_s1, q_humerus and q_elbow as approximated,
+// and will refine q_s1, q_humerus and q_elbow to attempt a precise fit to desired wrist position;
+// improved soln is returned in q123_precise
+double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_hand_pose,Vectorq7x1 q123_approx, Vectorq7x1 q123_precise) {
+
+tested this with baxter_kinematics_test_Jacobian_main.cpp
+
+---next: bring over stagecoach_planning fnc;
+
+
+
+
+
