@@ -1,5 +1,5 @@
 // wsn test pgm to command joint values to Baxter
-// try out some predefined poses:
+// accept keyboard commands
 
 
 #include <ros/init.h>
@@ -62,8 +62,18 @@ int main(int argc, char** argv){
      left_cmd.command[i] = mantis_left[i]; // left arm, pre-defined "mantis" pose
    }
 */
+  int jnum;
+  double jval;
 // loop sending out these commands; control-C to halt this node
   while(ros::ok()){ //while ROS is okay...
+      cout<<"enter joint number (right arm): 0 through 6 (neg or >6 to quit): ";
+      cin>>jnum;
+      if (jnum<0) break;
+      if (jnum>6) break;
+      cout<<"enter joint angle value command: ";
+      cin>>jval;
+
+      right_cmd.command[jnum]=jval;
 
     // boring--always sending out same commands;  could make this more interesting
      pub_right.publish(right_cmd); //publish jnt cmds to right arm
@@ -71,4 +81,5 @@ int main(int argc, char** argv){
      ros::Duration(dt).sleep(); //Wait dt
 
   }
+  return 0;
 }
