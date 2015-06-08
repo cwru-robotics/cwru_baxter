@@ -122,11 +122,14 @@ include_directories(
 # add_executable(baxter_kinematics_node src/baxter_kinematics_node.cpp)
 add_executable(baxter_kinematics_test_main src/baxter_kinematics_test_main.cpp)
 add_executable(baxter_kinematics_test_main2 src/baxter_kinematics_test_main2.cpp)
+
 add_executable(baxter_kinematics_test_main3 src/baxter_kinematics_test_main3.cpp)
+add_executable(baxter_kinematics_test_main4 src/baxter_kinematics_test_main4.cpp)
 add_executable(baxter_kinematics_test_jacobian_main src/baxter_kinematics_test_jacobian_main.cpp)
 target_link_libraries(baxter_kinematics_test_main baxter_kinematics ${catkin_LIBRARIES})
 target_link_libraries(baxter_kinematics_test_main2 baxter_kinematics ${catkin_LIBRARIES})
 target_link_libraries(baxter_kinematics_test_main3 baxter_kinematics ${catkin_LIBRARIES})
+target_link_libraries(baxter_kinematics_test_main4 baxter_kinematics ${catkin_LIBRARIES})
 target_link_libraries(baxter_kinematics_test_jacobian_main baxter_kinematics ${catkin_LIBRARIES})
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
