@@ -85,7 +85,65 @@ double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_hand_
 
 tested this with baxter_kinematics_test_Jacobian_main.cpp
 
+--reconcile xform w/rt torso frame:
+created fnc: fwd_kin_solve_wrt_torso(q_vec);
+agrees w/ tf; looks good
+
 ---next: bring over stagecoach_planning fnc;
+
+--started creation of cwru_joint_space_planner; seem to have successfully compiled; need to give it a try
+
+--6/1: added ik_solve_approx_wrt_torso_given_qs0(0),
+   fixed bug in precise_soln_q123()
+   added update_spherical_wrist();
+  to iterate for a precise soln, do this:
+   1) solve q123 (approx)
+   2) for each of above, solve q456;  there are now up to 4 solns
+   3) for each of the above, do precise_soln_q123, followed by update_spherical_wrist()
+For step 3, need an entire 7dof approx soln to proceed, since rotation of forearm affects q123 precise soln,
+  and precise soln affects q456 of wrist;
+
+-- added: improve_7dof_soln(Affine_flange_wrt_arm_mount, q_approx, q_7dof_precise);
+  combines precise_soln_q123() and update_spherical_wrist()
+  given an approx 7dof soln, finds the corresponding 7dof precise soln
+  (tested in main3)
+
+--created new package: baxter_traj_streamer, w/ library (class)
+does:
+  void Baxter_traj_streamer::stuff_trajectory( std::vector<Vectorq7x1> qvecs, trajectory_msgs::JointTrajectory &new_trajectory) {
+ and:
+  void Baxter_traj_streamer::pub_right_arm_trajectory(trajectory_msgs::JointTrajectory &new_trajectory)
+
+If one creates a trajectory as a vector of Vectorq7x1, stuff_trajectory converts this into a "trajectory"
+format and assigns reasonable time checkpoints
+
+pub_right_arm_trajectory() publishes a trajectory to topic right_arm_joint_path_command
+
+Need another node that receives trajectories and streams them out to Baxter with assigned timing
+
+wrote baxter_traj_interpolator_node shell: subscribes to and receives trajectories, 
+  needs to execute them with proper interpolation/timing
+  written and compiles--but needs testing/debugging
+
+to run, 
+  start gazebo (and enable robot)
+  start some trajectory computation node, e.g. baxter_traj_streamer_test_main (creates and publishes trajectory messages)
+  start baxter_traj_interpolator_node (receives trajectory messages and interpolates motion commands at 100Hz)
+
+interpolator node may be OK;  plotted with:
+/robot/limb/right/joint_command/command[6] (etc) from rqt_plot
+
+6/2: started baxter_traj_streamer/src/elbow_orbit_plan_main.cpp,
+   which includes libraries:
+#include <joint_space_planner.h>  (should put this one in subdir, to be consistent)
+#include <baxter_kinematics/baxter_kinematics.h>
+#include <baxter_traj_streamer/baxter_traj_streamer.h>
+got this to compile--but still need to develop the logic.  Want to:
+*construct "layers" consisting of IK solns at each index value of q_s0
+*assemble layers into a "path_options" vector;
+*invoke planner/solver to get "optimal_path";
+*convert "optimal_path" to a "trajectory" (with timing)
+*publish this trajectory to get streamer node to execute it 
 
 
 

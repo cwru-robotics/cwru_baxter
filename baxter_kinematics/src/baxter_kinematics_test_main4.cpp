@@ -1,8 +1,8 @@
-// baxter_kinematics_test_main3.cpp
+// baxter_kinematics_test_main4.cpp
 // wsn, May 2015
 // test function for baxter_kinematics library
-// this version to test higher-level fnc: ik_solve_approx()
-
+// this version to test higher-level fnc: ik_solve_approx_wrt_torso()
+//int Baxter_IK_solver::ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns)
 
 #include <baxter_kinematics/baxter_kinematics.h>
 #include <tf/transform_listener.h>
@@ -92,101 +92,35 @@ int main(int argc, char **argv) {
     }
     ROS_INFO("tf is good");
     //right_upper_shoulder is located at bottom of first shoulder jnt
-    // from now on, tfListener will keep track of transforms    
-    tfListener.lookupTransform("right_arm_mount", "right_lower_shoulder", ros::Time(0), tfResult);
+    // from now on, tfListener will keep track of transforms         
+    tfListener.lookupTransform("torso","right_hand",  ros::Time(0), tfResult);
     tf::Vector3 pos = tfResult.getOrigin();
-    ROS_INFO("shoulder x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);
+    ROS_INFO("hand x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);  
+    //wait for joint states:
+    q_vec_right_arm[0] = 1000.0;
+    while (q_vec_right_arm[0]>500) {
+     // spin to get current joint angles
+            ros::spinOnce();
+            ros::Duration(0.1).sleep(); 
+    } 
+    q_snapshot = q_vec_right_arm; // this is robot's current pose;
+    cout<<"got joint angles: "<<q_snapshot.transpose()<<endl;
 
-    tfListener.lookupTransform("right_arm_mount","right_lower_elbow", ros::Time(0), tfResult);
-    pos = tfResult.getOrigin();
-    ROS_INFO("elbow x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);
-    tfListener.lookupTransform("right_arm_mount","right_lower_forearm",  ros::Time(0), tfResult);
-    pos = tfResult.getOrigin();
-    ROS_INFO("wrist x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);     
-    tfListener.lookupTransform("right_arm_mount","right_hand",  ros::Time(0), tfResult);
-    pos = tfResult.getOrigin();
-    ROS_INFO("hand x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);   
-    
+            
     Baxter_fwd_solver baxter_fwd_solver; //instantiate a forward-kinematics solver
     Baxter_IK_solver baxter_IK_solver;  // instantiate an IK solver
     
+    Eigen::Affine3d Affine_flange_wrt_utorso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot);
     
-    //Baxter_IK_solver ik_solver;
-    Eigen::Affine3d A_fwd_DH;
-    Eigen::Matrix4d A_wrist,A_elbow,A_shoulder,A_flange;    
-    Eigen::Matrix3d R_hand;
-    std::cout << "==== Test for Baxter kinematics solver ====" << std::endl;
+    std::vector<Vectorq7x1> q_solns;    
+    int nsolns = baxter_IK_solver.ik_solve_approx(Affine_flange_wrt_utorso,q_solns);  
+    cout<<"num solns: "<<nsolns<<endl;  
+    
+    //return 0;
+    
 
-    Eigen::Matrix3d R_flange_wrt_right_arm_mount;
-    Eigen::Vector3d wrist_pt_wrt_right_arm_frame1;
-    Eigen::Vector3d w_err;
-    int ans;
-    int nsolns;
-    bool valid;
-    Vectorq7x1 q_vec_display,q_precise,q_soln_w_wrist_precise;
-    std::vector<Vectorq7x1> q_solns;   
-  // try new fnc:     
-    //int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns) {
-        q_snapshot = q_vec_right_arm;
-        cout<<"qvec right arm: "<<endl;
-        cout<< q_snapshot.transpose() <<endl;
-        // from this test pose, establish a viable hand frame:
-    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot); //fwd_kin_solve
-    
-    Eigen::Affine3d Affine_flange_wrt_arm_mount = 
-            baxter_fwd_solver.transform_affine_from_torso_frame_to_arm_mount_frame(Affine_flange_wrt_torso);
-    R_flange_wrt_right_arm_mount = Affine_flange_wrt_arm_mount.linear();
-    nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso_given_qs0(Affine_flange_wrt_torso,q_snapshot[0],q_solns);
-    cout<<"ik_solve_approx_wrt_torso_given_qs0 found nsolns = "<<nsolns<<endl;
-    for (int i=0;i<nsolns;i++) {
-        cout<<q_solns[i].transpose()<<endl;
-    }
-    Vectorq7x1 q_approx;
-    Vectorq7x1 q_7dof_precise;
-    cout<<"result of new fnc improve_7dof_soln:"<<endl;    
-    for (int i=0;i<nsolns;i++) {
-        q_approx = q_solns[i];
-        valid = baxter_IK_solver.improve_7dof_soln(Affine_flange_wrt_arm_mount, q_approx, q_7dof_precise); 
-        cout<<q_7dof_precise.transpose()<<endl;        
-    }    
-    //q_precise = q_solns[0]; // pick one and improve on it;
-    // need to do this for each soln, e.g. 4 solns per q_s0;
-    //double w_err_norm= baxter_IK_solver.precise_soln_q123(Affine_flange_wrt_arm_mount,q_solns[0], q_precise);
-    //cout<<"q123 soln after Jacobian iterations: "<<endl;
-    //cout<<q_precise.transpose()<<endl;
-    //correspondingly, do this for each of the above improved q123 solns   
-    //baxter_IK_solver.update_spherical_wrist(q_precise,R_flange_wrt_right_arm_mount, q_soln_w_wrist_precise);
-    //cout<<"soln after update wrist: "<<endl;
-    //cout<<q_soln_w_wrist_precise.transpose()<<endl;
-    
-    //valid = baxter_IK_solver.improve_7dof_soln(Affine_flange_wrt_arm_mount, q_approx, q_7dof_precise); 
-    //cout<<"result of new fnc improve_7dof_soln:"<<endl;
-    //cout<<q_7dof_precise.transpose()<<endl;
-    //baxter_IK_solver.solve_spherical_wrist(q_precise,R_flange_wrt_right_arm_mount, q_soln_w_wrist_precise); 
-    //cout<<"solns after Jacobian iterations: "<<endl;
-    //for (int i=0;i<q_solns_w_wrist_precise.size();i++) {
-    //    cout<<q_solns_w_wrist_precise[i].transpose()<<endl;
-    //}    
-    
-    
-    
-    while (ros::ok()) 
-    {
-        cout<<"enter 1 to initiate: "; //pause here to allow user to move joint angles to desired test pose
-        cin>>ans;
-        for (int i=0;i<10;i++) { // spin to get current joint angles
-            ros::spinOnce();
-            ros::Duration(0.1).sleep(); //sleep for 2 seconds
-        }
-        q_snapshot = q_vec_right_arm;
-        cout<<"qvec right arm: "<<endl;
-        cout<< q_snapshot.transpose() <<endl;
-        // from this test pose, establish a viable hand frame:
-        A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_snapshot); //fwd_kin_solve
-
-        cout<<"TRYING NEW FNC ik_solve_approx"<<endl;
-        nsolns = baxter_IK_solver.ik_solve_approx(A_fwd_DH,q_solns);
-        cout<<"num solns: "<<nsolns<<endl;
+    Vectorq7x1 q_vec_display;
+   
         cout<<"commanding these solutions..."<<endl;
 
  
@@ -200,11 +134,7 @@ int main(int argc, char **argv) {
             cout<<"soln: "<<q_vec_display.transpose()<<endl;
             ros::Duration(2).sleep(); //sleep for 2 seconds
             ros::spinOnce();            
-        }
-    
-    ros::Duration(2).sleep(); //sleep for 2 seconds
-    ros::spinOnce();
 
-    }
+        }
     return 0;
 }

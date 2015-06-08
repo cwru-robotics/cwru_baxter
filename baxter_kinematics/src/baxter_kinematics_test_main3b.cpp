@@ -116,60 +116,13 @@ int main(int argc, char **argv) {
     Eigen::Matrix4d A_wrist,A_elbow,A_shoulder,A_flange;    
     Eigen::Matrix3d R_hand;
     std::cout << "==== Test for Baxter kinematics solver ====" << std::endl;
-
     Eigen::Matrix3d R_flange_wrt_right_arm_mount;
     Eigen::Vector3d wrist_pt_wrt_right_arm_frame1;
     Eigen::Vector3d w_err;
     int ans;
     int nsolns;
-    bool valid;
-    Vectorq7x1 q_vec_display,q_precise,q_soln_w_wrist_precise;
-    std::vector<Vectorq7x1> q_solns;   
-  // try new fnc:     
-    //int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns) {
-        q_snapshot = q_vec_right_arm;
-        cout<<"qvec right arm: "<<endl;
-        cout<< q_snapshot.transpose() <<endl;
-        // from this test pose, establish a viable hand frame:
-    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot); //fwd_kin_solve
-    
-    Eigen::Affine3d Affine_flange_wrt_arm_mount = 
-            baxter_fwd_solver.transform_affine_from_torso_frame_to_arm_mount_frame(Affine_flange_wrt_torso);
-    R_flange_wrt_right_arm_mount = Affine_flange_wrt_arm_mount.linear();
-    nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso_given_qs0(Affine_flange_wrt_torso,q_snapshot[0],q_solns);
-    cout<<"ik_solve_approx_wrt_torso_given_qs0 found nsolns = "<<nsolns<<endl;
-    for (int i=0;i<nsolns;i++) {
-        cout<<q_solns[i].transpose()<<endl;
-    }
-    Vectorq7x1 q_approx;
-    Vectorq7x1 q_7dof_precise;
-    cout<<"result of new fnc improve_7dof_soln:"<<endl;    
-    for (int i=0;i<nsolns;i++) {
-        q_approx = q_solns[i];
-        valid = baxter_IK_solver.improve_7dof_soln(Affine_flange_wrt_arm_mount, q_approx, q_7dof_precise); 
-        cout<<q_7dof_precise.transpose()<<endl;        
-    }    
-    //q_precise = q_solns[0]; // pick one and improve on it;
-    // need to do this for each soln, e.g. 4 solns per q_s0;
-    //double w_err_norm= baxter_IK_solver.precise_soln_q123(Affine_flange_wrt_arm_mount,q_solns[0], q_precise);
-    //cout<<"q123 soln after Jacobian iterations: "<<endl;
-    //cout<<q_precise.transpose()<<endl;
-    //correspondingly, do this for each of the above improved q123 solns   
-    //baxter_IK_solver.update_spherical_wrist(q_precise,R_flange_wrt_right_arm_mount, q_soln_w_wrist_precise);
-    //cout<<"soln after update wrist: "<<endl;
-    //cout<<q_soln_w_wrist_precise.transpose()<<endl;
-    
-    //valid = baxter_IK_solver.improve_7dof_soln(Affine_flange_wrt_arm_mount, q_approx, q_7dof_precise); 
-    //cout<<"result of new fnc improve_7dof_soln:"<<endl;
-    //cout<<q_7dof_precise.transpose()<<endl;
-    //baxter_IK_solver.solve_spherical_wrist(q_precise,R_flange_wrt_right_arm_mount, q_soln_w_wrist_precise); 
-    //cout<<"solns after Jacobian iterations: "<<endl;
-    //for (int i=0;i<q_solns_w_wrist_precise.size();i++) {
-    //    cout<<q_solns_w_wrist_precise[i].transpose()<<endl;
-    //}    
-    
-    
-    
+    Vectorq7x1 q_vec_display;
+    std::vector<Vectorq7x1> q_solns;    
     while (ros::ok()) 
     {
         cout<<"enter 1 to initiate: "; //pause here to allow user to move joint angles to desired test pose

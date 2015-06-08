@@ -127,6 +127,15 @@ const double rmount_to_r_lower_forearm_x = 0.055695;
 const double rmount_to_r_lower_forearm_y = 0.0;
 const double rmount_to_r_lower_forearm_z = 0.011038;
 
+//transform from torso frame to right-arm-mount frame:
+// vector to right-arm mount origin, w/rt torso frame:
+const double torso_to_rmount_x =  0.024645;
+const double torso_to_rmount_y = -0.219645;
+const double torso_to_rmount_z = 0.118588;
+//axes of arm-mount frame are rotated about z w/rt torso,
+// R_rmount_axes_wrt_torso = Rotz(theta_z_arm_mount)
+const double theta_z_arm_mount = -M_PI/4;
+
 //some arbitrary, tunable constants:
 const double r_goal_max = 0.745; // forbid reach > this, from shoulder to wrist; forces bent elbows and avoids singularities
 const double DQS0 = 0.05; // increment dq0 this much is search of indexed null-space solutions
@@ -142,6 +151,7 @@ public:
     // these functions are for RIGHT ARM ONLY
     Eigen::Affine3d fwd_kin_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin
     Eigen::Affine3d fwd_kin_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
+    Eigen::Affine3d fwd_kin_solve_wrt_torso(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame)
     Eigen::Matrix4d get_wrist_frame();
     Eigen::Matrix4d get_shoulder_frame();
     Eigen::Matrix4d get_elbow_frame();
@@ -153,6 +163,7 @@ public:
     Eigen::Matrix4d get_flange_frame_approx();
     Eigen::Matrix3d get_wrist_Jacobian_3x3(double q_s1, double q_humerus, double q_elbow, double q_forearm); //3x3 J for wrist point coords
     Eigen::Vector3d get_wrist_coords_wrt_frame1(const Vectorq7x1& q_vec); //fwd kin from frame 1 to wrist pt
+    Eigen::Affine3d transform_affine_from_torso_frame_to_arm_mount_frame(Eigen::Affine3d pose_wrt_torso);    
     //CREATE CORRESPONDING FUNCTIONS FOR LEFT ARM...
     
 //private: do not make these private, so IK can access them
@@ -162,6 +173,9 @@ public:
     Eigen::Matrix4d A_mats[7], A_mat_products[7], A_tool; // note: tool A must also handle diff DH vs URDF frame-7 xform
     Eigen::Matrix4d A_mats_approx[7], A_mat_products_approx[7];
     Eigen::Matrix4d A_rarm_mount_to_r_lower_forearm;
+    Eigen::Affine3d Affine_rarm_mount_to_r_lower_forearm;   
+    Eigen::Matrix4d A_torso_to_rarm_mount;    
+    Eigen::Affine3d Affine_torso_to_rarm_mount;
     Eigen::MatrixXd Jacobian;
     // CREATE CORRESPONDING FUNCTIONS FOR LEFT ARM...
 };
@@ -177,6 +191,7 @@ public:
     bool fit_joints_to_range(Vectorq7x1 &qvec);
     Eigen::Vector3d wrist_frame0_from_tool_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame);    
     Eigen::Vector3d wrist_frame1_from_tool_wrt_rarm_mount(Eigen::Affine3d,  Vectorq7x1 q_vec); // bad name
+    Eigen::Vector3d wrist_pt_from_flange_frame(Eigen::Affine3d affine_flange_frame);    
     //here is identical fnc, w/ better name
     Eigen::Vector3d wrist_pt_wrt_frame1_of_flange_des_and_qs0(Eigen::Affine3d affine_flange_frame, Vectorq7x1 q_vec);
     //Eigen::MatrixXd get_Jacobian(const Vectorq6x1& q_vec);
@@ -188,11 +203,19 @@ public:
     // given desired hand pose, find all viable IK solns, indexed by q_s0 values, w/ resolution DQS0    
     int ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns); 
     
+    // this version takes arm of desired hand pose w/rt torso frame
+    int ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns);
+    int ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<std::vector<Eigen::VectorXd> > &path_options);
+  
+    // in this version, soln ONLY for specified q_s0;  specify q_s0 and desired hand pose, w/rt torso
+    // expect from 0 to 4 solutions at given q_s0    
+    int ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns);
+    
     //function to find precise values of joint angles q1, q2, q3 to match desired wrist position, implied by desired_hand_pose
     //provide q123_approx; this function will take q_s0 and q_forearm as specified, and q_s1, q_humerus and q_elbow as approximated,
     // and will refine q_s1, q_humerus and q_elbow to attempt a precise fit to desired wrist position;
     // improved soln is returned in q123_precise
-    double precise_soln_q123(Eigen::Affine3d const& desired_hand_pose,Vectorq7x1 q123_approx, Vectorq7x1 q123_precise);
+    double precise_soln_q123(Eigen::Affine3d const& desired_hand_pose,Vectorq7x1 q123_approx, Vectorq7x1 &q123_precise);
     //fnc to find q_s0_min and q_s0_max given desired hand pose
     double compute_qs0_ctr(Eigen::Affine3d const& desired_hand_pose);
     
@@ -210,7 +233,9 @@ public:
     //bool solve_for_theta3(Eigen::Vector3d w_wrt_1,double r_goal, double q3_solns[2]); 
 
     bool solve_spherical_wrist(Vectorq7x1 q_in,Eigen::Matrix3d R_des, std::vector<Vectorq7x1> &q_solns);  
-    
+    bool update_spherical_wrist(Vectorq7x1 q_in,Eigen::Matrix3d R_des, Vectorq7x1 &q_precise);
+    bool improve_7dof_soln(Eigen::Affine3d const& desired_hand_pose_wrt_arm_mount, Vectorq7x1 q_in, Vectorq7x1 &q_7dof_precise);
+   
 private:
     bool fit_q_to_range(double q_min, double q_max, double &q);    
     std::vector<Vectorq7x1> q7dof_solns;

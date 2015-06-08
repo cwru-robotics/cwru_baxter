@@ -5,6 +5,10 @@
 
 #include <baxter_kinematics/baxter_kinematics.h>
  #include <tf/transform_listener.h>
+//#include <tf/Quaternion.h>
+#include <tf/LinearMath/Quaternion.h>
+#include <Eigen/Geometry> 
+using namespace std;
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "baxter_kinematics_test_main");
@@ -27,7 +31,7 @@ int main(int argc, char **argv) {
                 //try to lookup transform from target frame "odom" to source frame "map"
             //The direction of the transform returned will be from the target_frame to the source_frame. 
              //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-                tfListener.lookupTransform("right_hand", "right_upper_shoulder", ros::Time(0), baseToHand);
+                tfListener.lookupTransform("right_hand", "torso", ros::Time(0), baseToHand);
             } catch(tf::TransformException &exception) {
                 ROS_ERROR("%s", exception.what());
                 tferr=true;
@@ -38,8 +42,27 @@ int main(int argc, char **argv) {
     ROS_INFO("tf is good");
     //right_upper_shoulder is located at bottom of first shoulder jnt
     // from now on, tfListener will keep track of transforms    
-    tfListener.lookupTransform("right_upper_shoulder", "right_lower_shoulder", ros::Time(0), baseToHand);
+    tfListener.lookupTransform("torso", "right_arm_mount", ros::Time(0), baseToHand);
     tf::Vector3 pos = baseToHand.getOrigin();
+    ROS_INFO("right_arm_mount w/rt torso:  x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);  
+    //baseToHand.getRotation()
+    tf::Quaternion quat = baseToHand.getRotation();
+  
+    Eigen::Quaterniond e_quat;
+    e_quat.x() = quat.x();
+    e_quat.y() = quat.y();
+    e_quat.z() = quat.z();
+    e_quat.w() = quat.w();   
+    Eigen::Matrix3d Rmount =  e_quat.toRotationMatrix();
+    cout<<"Rmount = "<<endl;
+    cout<<Rmount<<endl;
+    
+
+    Eigen::Matrix4d A_flange;
+    //Eigen::Affine3d Affine_flange = baxter_fwd_solver.fwd_kin_solve_wrt_torso(const Vectorq7x1& q_vec);
+            
+    tfListener.lookupTransform("right_upper_shoulder", "right_lower_shoulder", ros::Time(0), baseToHand);
+    pos = baseToHand.getOrigin();
     ROS_INFO("shoulder x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);
 
     tfListener.lookupTransform("right_upper_shoulder","right_lower_elbow", ros::Time(0), baseToHand);
@@ -52,8 +75,9 @@ int main(int argc, char **argv) {
     pos = baseToHand.getOrigin();
     ROS_INFO("hand x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);   
     
-    Baxter_fwd_solver baxter_fwd_solver;
+
     //Baxter_IK_solver ik_solver;
+        Baxter_fwd_solver baxter_fwd_solver; //instantiate a forward-kinematics solver
 
     std::cout << "==== Test for Baxter kinematics solver ====" << std::endl;
     int ans = 1;
@@ -83,7 +107,7 @@ int main(int argc, char **argv) {
             //std::cout << A_fwd_URDF.linear() << std::endl;
             //std::cout << "A origin: " << A_fwd_URDF.translation().transpose() << std::endl;
             //Eigen::Matrix3d R_flange = A_fwd_URDF.linear();
-            Eigen::Matrix4d A_wrist,A_elbow,A_shoulder,A_flange;
+            Eigen::Matrix4d A_wrist,A_elbow,A_shoulder;
 
 
 

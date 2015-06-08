@@ -14,6 +14,8 @@
 //stuff to command joint values:
 #include <std_msgs/Float32.h> //Including the Float32 class from std_msgs
 #include <baxter_core_msgs/JointCommand.h>
+#include <tf/LinearMath/Quaternion.h>
+#include <Eigen/Geometry> 
 
 using namespace std;
 
@@ -94,6 +96,7 @@ int main(int argc, char **argv) {
             }   
     }
     ROS_INFO("tf is good");
+    q_snapshot = q_vec_right_arm;
     //right_upper_shoulder is located at bottom of first shoulder jnt
     // from now on, tfListener will keep track of transforms    
     tfListener.lookupTransform("right_arm_mount", "right_lower_shoulder", ros::Time(0), tfResult);
@@ -113,6 +116,52 @@ int main(int argc, char **argv) {
     Baxter_fwd_solver baxter_fwd_solver; //instantiate a forward-kinematics solver
     Baxter_IK_solver baxter_IK_solver;  // instantiate an IK solver
     
+    tfListener.lookupTransform("torso", "right_hand", ros::Time(0), tfResult);
+    pos = tfResult.getOrigin();
+    ROS_INFO("vector to right hand from torso:  x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);  
+    //baseToHand.getRotation()
+    tf::Quaternion quat = tfResult.getRotation();
+  
+    Eigen::Quaterniond e_quat;
+    e_quat.x() = quat.x();
+    e_quat.y() = quat.y();
+    e_quat.z() = quat.z();
+    e_quat.w() = quat.w();   
+    Eigen::Matrix3d Rflange =  e_quat.toRotationMatrix();
+    cout<<"Rflange = "<<endl;
+    cout<<Rflange<<endl;
+    
+    //compare to fwd kin soln:
+    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot);
+    cout<<"O of hand wrt torso from fwd kin: "<<Affine_flange_wrt_torso.translation().transpose()<<endl;
+    cout<<"R of hand wrt torso from fwd kin:"<<endl;
+    cout<<Affine_flange_wrt_torso.linear()<<endl;
+    
+    //test conversion fnc:
+    tfListener.lookupTransform("right_arm_mount", "right_hand", ros::Time(0), tfResult);
+    pos = tfResult.getOrigin();
+    ROS_INFO("vector to right hand from arm_mount:  x,y, z = %f, %f, %f",pos[0],pos[1],pos[2]);  
+    //baseToHand.getRotation()
+    quat = tfResult.getRotation();
+    e_quat.x() = quat.x();
+    e_quat.y() = quat.y();
+    e_quat.z() = quat.z();
+    e_quat.w() = quat.w();   
+    Rflange =  e_quat.toRotationMatrix();
+    cout<<"Rflange wrt arm-mount frame per tf = "<<endl;
+    cout<<Rflange<<endl;
+    
+    //compare w/ conversion fnc:
+    Eigen::Affine3d affine_hand_wrt_arm_mount = baxter_fwd_solver.transform_affine_from_torso_frame_to_arm_mount_frame(Affine_flange_wrt_torso);
+    cout<<"O of hand wrt arm mount per xform: "<<affine_hand_wrt_arm_mount.translation().transpose()<<endl;
+    cout<<"R of hand wrt arm mount per xform:"<<endl;
+    cout<<affine_hand_wrt_arm_mount.linear()<<endl;  
+    
+    
+    
+    int ans1;
+    cout<<"enter 1 to continue: ";
+    cin>>ans1;
     
     //Baxter_IK_solver ik_solver;
     Eigen::Affine3d A_fwd_DH;
