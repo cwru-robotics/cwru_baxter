@@ -99,6 +99,7 @@ double Baxter_traj_streamer::transition_time(Eigen::VectorXd dqvec) {
 }
 
 //command robot to move to "qvec" using a trajectory message, sent via ROS-I
+//OBSOLETE:  USE ALT FNC BELOW
 void Baxter_traj_streamer::stuff_trajectory( std::vector<Vectorq7x1> qvecs, trajectory_msgs::JointTrajectory &new_trajectory) {
     //new_trajectory.clear();
     trajectory_msgs::JointTrajectoryPoint trajectory_point1;
@@ -127,7 +128,8 @@ void Baxter_traj_streamer::stuff_trajectory( std::vector<Vectorq7x1> qvecs, traj
     double del_time;
     double net_time=0.0;
     q_start = qvecs[0];
-    q_end = qvecs[0];    
+    q_end = qvecs[0];   
+    cout<<"stuff_traj: start pt = "<<q_start.transpose()<<endl; 
     for (int i=0;i<7;i++) { //pre-size these vectors, so can access w/ indices
         trajectory_point1.positions[i]=q_start[i];
     }    
@@ -140,7 +142,7 @@ void Baxter_traj_streamer::stuff_trajectory( std::vector<Vectorq7x1> qvecs, traj
         dqvec = q_end-q_start;
         cout<<"dqvec: "<<dqvec.transpose()<<endl;
         del_time = transition_time(dqvec);
-
+        cout<<"stuff_traj: next pt = "<<q_end.transpose()<<endl; 
         net_time+= del_time;
         ROS_INFO("iq = %d; del_time = %f; net time = %f",iq,del_time,net_time);        
         for (int i=0;i<7;i++) { //pre-size these vectors, so can access w/ indices
@@ -177,25 +179,29 @@ void Baxter_traj_streamer::stuff_trajectory( std::vector<Eigen::VectorXd> qvecs,
     double del_time;
     double net_time=0.0;
     q_start = qvecs[0];
-    q_end = qvecs[0];    
+    q_end = qvecs[0];   
+     cout<<"stuff_traj: start pt = "<<q_start.transpose()<<endl; 
+
     //trajectory_point1.positions = qvecs[0];
  
     trajectory_point1.time_from_start =    ros::Duration(net_time); 
+    for (int i=0;i<7;i++) { //pre-sizes positions vector, so can access w/ indices later
+        trajectory_point1.positions.push_back(q_start[i]);
+    } 
     new_trajectory.points.push_back(trajectory_point1); // first point of the trajectory
     //add the rest of the points from qvecs
-    for (int i=0;i<7;i++) { //pre-size these vectors, so can access w/ indices
-        trajectory_point1.positions.push_back(0.0);
-    }    
+   
+
     for (int iq=1;iq<qvecs.size();iq++) {
         q_start = q_end;
         q_end = qvecs[iq];
         dqvec = q_end-q_start;
         cout<<"dqvec: "<<dqvec.transpose()<<endl;
         del_time = transition_time(dqvec);
-
+        cout<<"stuff_traj: next pt = "<<q_end.transpose()<<endl; 
         net_time+= del_time;
         ROS_INFO("iq = %d; del_time = %f; net time = %f",iq,del_time,net_time);        
-        for (int i=0;i<7;i++) { //pre-size these vectors, so can access w/ indices
+        for (int i=0;i<7;i++) { //copy over the joint-command values
             trajectory_point1.positions[i]=q_end[i];
         }   
         //trajectory_point1.positions = q_end;

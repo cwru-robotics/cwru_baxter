@@ -26,6 +26,26 @@ void reversePathFnc(std::vector<Eigen::VectorXd> fwd_path, std::vector<Eigen::Ve
     }
 }
 
+
+ Vectorq7x1 q_vec_right_arm,q_in,q_soln,q_snapshot;
+
+void jointStatesCb(const sensor_msgs::JointState& js_msg) {
+    // copy right-arm angles to global vec
+    for (int i=0;i<7;i++)
+    {
+        // should do this better; manually remap from joint_states indices to right-arm joint angles
+        q_vec_right_arm[6] = js_msg.position[14]; //w2
+        q_vec_right_arm[5] = js_msg.position[13]; //w1
+        q_vec_right_arm[4] = js_msg.position[12]; //w0
+        q_vec_right_arm[3] = js_msg.position[9]; //e1
+        q_vec_right_arm[2] = js_msg.position[8]; //e0  
+        q_vec_right_arm[1] = js_msg.position[11]; //s1
+        q_vec_right_arm[0] = js_msg.position[10]; //s0           
+    }
+}    
+
+
+
 int main(int argc, char **argv) {
     Eigen::VectorXd weights;
     //Eigen::VectorXd vec2;
@@ -50,6 +70,20 @@ int main(int argc, char **argv) {
     std::vector<Eigen::VectorXd> layer;
     Eigen::VectorXd node;
     q_test << 0, 0.5, 0.5, 1, 1, 1, 1; //some initial pose to define viable hand frame from which to do elbow orbit
+
+    ros::Subscriber joint_state_sub = nh.subscribe("robot/joint_states", 1, jointStatesCb); //subscribe to joint-state values
+    // wait for valid data:
+    q_vec_right_arm[0] = 1000;
+    while (true) //q_vec_right_arm[0]>100) 
+   {
+        //ROS_INFO("waiting for valid state data...");
+        cout<<q_vec_right_arm.transpose()<<endl;
+        ros::spinOnce();
+        ros::Duration(0.5).sleep();
+    }
+    q_test = q_vec_right_arm; //use this pose as start of plan for elbow orbit
+    cout<<"plan from current pose: "<<q_test.transpose()<<endl;
+
 
     Eigen::Affine3d desired_hand_pose_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_test);
     nlayers = baxter_IK_solver.ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(desired_hand_pose_wrt_torso, path_options);

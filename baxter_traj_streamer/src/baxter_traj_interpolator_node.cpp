@@ -19,6 +19,17 @@ void trajectoryCb(const trajectory_msgs::JointTrajectory& tj_msg) {
     // insist that a traj have at least 2 pts
     if (new_trajectory.points.size()>1) got_new_trajectory = true;
     cout<<"Cb received traj w/ npts = "<<new_trajectory.points.size()<<endl;
+        trajectory_msgs::JointTrajectoryPoint trajectory_point0;
+        trajectory_point0 = new_trajectory.points[0];  
+        trajectory_point0 =  tj_msg.points[0];   
+        cout<<tj_msg.points[0].positions.size()<<" =  tj_msg.points[0].positions.size()"<<endl;
+        cout<<"size of positions[]: "<<trajectory_point0.positions.size()<<endl;
+        cout<<"1st pt: ";
+          for (int i=0;i<7;i++) { //copy from traj point to 7x1 vector
+            cout<<trajectory_point0.positions[i]<<", ";           
+          }
+          cout<<endl;
+
 } 
 
 void cmd_pose_right(Vectorq7x1 qvec ) {
@@ -143,10 +154,11 @@ int main(int argc, char** argv){
           isegment=0;
           trajectory_point0 = new_trajectory.points[0];         
           for (int i=0;i<7;i++) { //copy from traj point to 7x1 vector
-            qvec0[i] = trajectory_point0.positions[i];          
+            qvec0[i] = trajectory_point0.positions[i];           
           }
           cmd_pose_right(qvec0);  //populate and send out first command  
           qvec_prev = qvec0;
+          cout<<"start pt: "<< qvec0.transpose()<<endl;
       }
       //working_on_trajectory = false;
 
