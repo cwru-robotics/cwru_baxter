@@ -10,7 +10,7 @@ bool got_new_trajectory = false;
 bool working_on_trajectory = false;
 baxter_core_msgs::JointCommand right_cmd,left_cmd;
 ros::Publisher joint_cmd_pub_right;
-double dt_traj = 0.01; // time step
+//double dt_traj = 0.01; // time step
 //complement of this:
 // right_traj_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("right_arm_joint_path_command", 1);  
 void trajectoryCb(const trajectory_msgs::JointTrajectory& tj_msg) {

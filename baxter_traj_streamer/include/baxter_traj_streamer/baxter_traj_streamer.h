@@ -30,6 +30,7 @@ const double q3dotmax = 0.5;
 const double q4dotmax = 1;
 const double q5dotmax = 1;
 const double q6dotmax = 1;
+const double dt_traj = 0.01; // time step for trajectory interpolation
 
 
 
@@ -51,7 +52,8 @@ public:
     ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
     // some objects to support subscriber, service, and publisher
     ros::Subscriber joint_state_sub_; //these will be set up within the class constructor, hiding these ugly details
-    //ros::ServiceServer minimal_service_;
+    //ros::ServiceServer traj_interp_stat_client_;
+    ros::ServiceClient traj_interp_stat_client_;
     ros::Publisher  joint_cmd_pub_right_,joint_cmd_pub_left_;
     ros::Publisher  right_traj_pub_;
         
@@ -60,11 +62,15 @@ public:
     Vectorq7x1 q_vec_right_arm; //,q_in,q_soln,q_snapshot; 
     Vectorq7x1 qdot_max_vec; // velocity constraint on each joint for interpolation
     baxter_core_msgs::JointCommand right_cmd_,left_cmd_;  // define instances of these message types, to control arms    
+    cwru_srv::simple_bool_service_message traj_status_srv_;
+    
     // member methods as well:
     void initializeSubscribers(); // we will define some helper methods to encapsulate the gory details of initializing subscribers, publishers and services
     void initializePublishers();
-    //void initializeServices();
+    void initializeServices();
     void jointStatesCb(const sensor_msgs::JointState& js_msg); //prototype for callback of joint-state messages
+    void map_right_arm_joint_indices(vector<string> joint_names);
+    
     double transition_time(Vectorq7x1 dqvec);
     double transition_time(Eigen::VectorXd dqvec);
     //prototype for callback for example service

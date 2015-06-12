@@ -3,6 +3,10 @@
 //"include" path--should just be <baxter_kinematics/baxter_kinematics.h>, at least for modules outside this package
 #include <baxter_traj_streamer/baxter_traj_streamer.h>
 
+//make these member vars of class
+vector<string> g_all_jnt_names; 
+vector<int> right_arm_joint_indices;
+
 // odd syntax: have to pass nodehandle pointer into constructor for constructor to build subscribers, etc
 Baxter_traj_streamer::Baxter_traj_streamer(ros::NodeHandle* nodehandle){
     initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
@@ -34,6 +38,9 @@ Baxter_traj_streamer::Baxter_traj_streamer(ros::NodeHandle* nodehandle){
    }    
   
     qdot_max_vec<<q0dotmax,q1dotmax,q2dotmax,q3dotmax,q4dotmax,q5dotmax,q6dotmax;
+    
+   traj_interp_stat_client_ = nh_.serviceClient<cwru_srv::simple_bool_service_message>("trajInterpStatusSvc");
+
 }
 
 //member helper function to set up subscribers;
@@ -57,6 +64,19 @@ void Baxter_traj_streamer::initializePublishers()
     // note: COULD make minimal_publisher_ a public member function, if want to use it within "main()"
 }
 
+//member helper function to set up services:
+// similar syntax to subscriber, required for setting up services outside of "main()"
+void Baxter_traj_streamer::initializeServices()
+{
+    //ROS_INFO("Initializing Services");
+    //traj_interp_stat_client_ = nh_.advertiseService("exampleMinimalService",
+    //                                               &Baxter_traj_streamer::serviceCallback,
+    //                                               this);  
+    // add more services here, as needed
+}
+
+
+/*
 void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) {
     // copy right-arm angles to member vec
     for (int i=0;i<7;i++)
@@ -70,6 +90,62 @@ void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) 
         q_vec_right_arm[1] = js_msg.position[11]; //s1
         q_vec_right_arm[0] = js_msg.position[10]; //s0           
     }
+}  
+*/
+void Baxter_traj_streamer::map_right_arm_joint_indices(vector<string> joint_names) {
+ //vector<string> joint_names = joint_state->name;
+    vector<string> rt_limb_jnt_names;
+    
+            
+    right_arm_joint_indices.clear();
+    int index;
+    int n_jnts = joint_names.size();
+    cout<<"num jnt names = "<<n_jnts<<endl;
+    std::string j_name;
+    std::string j_s0_name ("right_s0");
+    rt_limb_jnt_names.push_back(j_s0_name);
+    std::string j_s1_name ("right_s1");
+   rt_limb_jnt_names.push_back(j_s1_name);    
+    std::string j_e0_name ("right_e0");
+   rt_limb_jnt_names.push_back(j_e0_name);    
+    std::string j_e1_name ("right_e1");
+   rt_limb_jnt_names.push_back(j_e1_name);    
+    std::string j_w0_name ("right_w0");
+   rt_limb_jnt_names.push_back(j_w0_name);    
+    std::string j_w1_name ("right_w1");   
+   rt_limb_jnt_names.push_back(j_w1_name);    
+    std::string j_w2_name ("right_w2");  
+   rt_limb_jnt_names.push_back(j_w2_name); 
+
+   for (int j=0;j<7;j++) {
+       j_name = rt_limb_jnt_names[j];
+       for (int i=0;i<n_jnts;i++) {
+        if (j_name.compare(joint_names[i])==0) {
+            index = i;
+            right_arm_joint_indices.push_back(index);
+            break;
+        }
+    }
+   }   
+   cout<<"indices of right-arm joints: "<<endl;
+   for (int i=0;i<7;i++) {
+       cout<<right_arm_joint_indices[i]<<", ";
+   }
+   cout<<endl;
+}
+
+void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) {
+    if (right_arm_joint_indices.size()<1) {
+       //g_all_jnt_names = js_msg.name;
+       map_right_arm_joint_indices(js_msg.name);
+    }
+    // copy right-arm angles to global vec
+    for (int i=0;i<7;i++)
+    {
+        // should do this better; manually remap from joint_states indices to right-arm joint angles
+        q_vec_right_arm[i] = js_msg.position[right_arm_joint_indices[i]]; //w2         
+    }
+    
 }  
 
 Vectorq7x1 Baxter_traj_streamer::get_qvec_right_arm() {
@@ -142,6 +218,8 @@ void Baxter_traj_streamer::stuff_trajectory( std::vector<Vectorq7x1> qvecs, traj
         dqvec = q_end-q_start;
         cout<<"dqvec: "<<dqvec.transpose()<<endl;
         del_time = transition_time(dqvec);
+        if (del_time< dt_traj)
+            del_time = dt_traj;
         cout<<"stuff_traj: next pt = "<<q_end.transpose()<<endl; 
         net_time+= del_time;
         ROS_INFO("iq = %d; del_time = %f; net time = %f",iq,del_time,net_time);        
@@ -198,6 +276,8 @@ void Baxter_traj_streamer::stuff_trajectory( std::vector<Eigen::VectorXd> qvecs,
         dqvec = q_end-q_start;
         cout<<"dqvec: "<<dqvec.transpose()<<endl;
         del_time = transition_time(dqvec);
+        if (del_time< dt_traj)
+            del_time = dt_traj;
         cout<<"stuff_traj: next pt = "<<q_end.transpose()<<endl; 
         net_time+= del_time;
         ROS_INFO("iq = %d; del_time = %f; net time = %f",iq,del_time,net_time);        
@@ -231,9 +311,28 @@ void Baxter_traj_streamer::pub_right_arm_trajectory_init() {
     std::vector<Vectorq7x1> qvecs;
     trajectory_msgs::JointTrajectory new_trajectory;
     Vectorq7x1 q_snapshot = q_vec_right_arm;
-    qvecs.push_back(q_vec_right_arm);
-    qvecs.push_back(q_vec_right_arm);    
-    stuff_trajectory(qvecs, new_trajectory);    
+    qvecs.push_back(q_snapshot);
+    qvecs.push_back(q_snapshot);    
+    stuff_trajectory(qvecs, new_trajectory);   
+    bool working_on_traj=true;
+    while (working_on_traj) {
+      traj_interp_stat_client_.call(traj_status_srv_); // communicate w/ trajectory interpolator node status service
+        working_on_traj = traj_status_srv_.response.resp;
+        cout<<"waiting for ready from interp node..."<<endl;
+        ros::spinOnce();
+    }
+    cout<<"interp node is ready for traj; sending"<<endl;
+    working_on_traj=true;
+
+ 
     right_traj_pub_.publish(new_trajectory);
     cout<<"publishing trajectory with npts = "<<new_trajectory.points.size()<<endl;
+    cout<<"cmd: "<<q_snapshot.transpose()<<endl;
+     ros::Duration(0.5).sleep(); // sleep for half a second
+    while(working_on_traj) {
+      traj_interp_stat_client_.call(traj_status_srv_); // communicate w/ trajectory interpolator node status service
+        working_on_traj = traj_status_srv_.response.resp;
+        cout<<"waiting for interp node to finish trajectory..."<<endl;
+        ros::spinOnce();       
+    }   
 }
