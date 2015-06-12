@@ -5,6 +5,7 @@
 #include <joint_space_planner.h>
 #include <baxter_kinematics/baxter_kinematics.h>
 #include <baxter_traj_streamer/baxter_traj_streamer.h>
+#include <string.h>
 //#include <baxter_kinematics.h>
 
 #include <stdio.h>      /* printf, scanf, puts, NULL */
@@ -28,23 +29,68 @@ void reversePathFnc(std::vector<Eigen::VectorXd> fwd_path, std::vector<Eigen::Ve
 
 
  Vectorq7x1 q_vec_right_arm,q_in,q_soln,q_snapshot;
+vector<string> g_all_jnt_names; 
+vector<int> right_arm_joint_indices;
+
+
+
+
+
+void map_right_arm_joint_indices(vector<string> joint_names) {
+ //vector<string> joint_names = joint_state->name;
+    vector<string> rt_limb_jnt_names;
+    
+            
+    right_arm_joint_indices.clear();
+    int index;
+    int n_jnts = joint_names.size();
+    cout<<"num jnt names = "<<n_jnts<<endl;
+    std::string j_name;
+    std::string j_s0_name ("right_s0");
+    rt_limb_jnt_names.push_back(j_s0_name);
+    std::string j_s1_name ("right_s1");
+   rt_limb_jnt_names.push_back(j_s1_name);    
+    std::string j_e0_name ("right_e0");
+   rt_limb_jnt_names.push_back(j_e0_name);    
+    std::string j_e1_name ("right_e1");
+   rt_limb_jnt_names.push_back(j_e1_name);    
+    std::string j_w0_name ("right_w0");
+   rt_limb_jnt_names.push_back(j_w0_name);    
+    std::string j_w1_name ("right_w1");   
+   rt_limb_jnt_names.push_back(j_w1_name);    
+    std::string j_w2_name ("right_w2");  
+   rt_limb_jnt_names.push_back(j_w2_name); 
+
+   for (int j=0;j<7;j++) {
+       j_name = rt_limb_jnt_names[j];
+       for (int i=0;i<n_jnts;i++) {
+        if (j_name.compare(joint_names[i])==0) {
+            index = i;
+            right_arm_joint_indices.push_back(index);
+            break;
+        }
+    }
+   }   
+   cout<<"indices of right-arm joints: "<<endl;
+   for (int i=0;i<7;i++) {
+       cout<<right_arm_joint_indices[i]<<", ";
+   }
+   cout<<endl;
+}
 
 void jointStatesCb(const sensor_msgs::JointState& js_msg) {
+    if (right_arm_joint_indices.size()<1) {
+       //g_all_jnt_names = js_msg.name;
+       map_right_arm_joint_indices(js_msg.name);
+    }
     // copy right-arm angles to global vec
     for (int i=0;i<7;i++)
     {
         // should do this better; manually remap from joint_states indices to right-arm joint angles
-        q_vec_right_arm[6] = js_msg.position[14]; //w2
-        q_vec_right_arm[5] = js_msg.position[13]; //w1
-        q_vec_right_arm[4] = js_msg.position[12]; //w0
-        q_vec_right_arm[3] = js_msg.position[9]; //e1
-        q_vec_right_arm[2] = js_msg.position[8]; //e0  
-        q_vec_right_arm[1] = js_msg.position[11]; //s1
-        q_vec_right_arm[0] = js_msg.position[10]; //s0           
+        q_vec_right_arm[i] = js_msg.position[right_arm_joint_indices[i]]; //w2         
     }
+    
 }    
-
-
 
 int main(int argc, char **argv) {
     Eigen::VectorXd weights;
@@ -56,6 +102,8 @@ int main(int argc, char **argv) {
     Baxter_fwd_solver baxter_fwd_solver; //instantiate a forward-kinematics solver
     Baxter_IK_solver baxter_IK_solver; // instantiate an IK solver
 
+
+    
     //pass in nh, so constructor can set up subscribers, publishers and services
     Baxter_traj_streamer baxter_traj_streamer(&nh);
     cwru_srv::simple_bool_service_message srv;
@@ -74,20 +122,27 @@ int main(int argc, char **argv) {
     ros::Subscriber joint_state_sub = nh.subscribe("robot/joint_states", 1, jointStatesCb); //subscribe to joint-state values
     // wait for valid data:
     q_vec_right_arm[0] = 1000;
-    while (true) //q_vec_right_arm[0]>100) 
+    cout<<"waiting for valid joint_state message..."<<endl;
+   while(q_vec_right_arm[0]>100) 
    {
         //ROS_INFO("waiting for valid state data...");
         cout<<q_vec_right_arm.transpose()<<endl;
         ros::spinOnce();
         ros::Duration(0.5).sleep();
     }
+        
     q_test = q_vec_right_arm; //use this pose as start of plan for elbow orbit
     cout<<"plan from current pose: "<<q_test.transpose()<<endl;
 
 
+
     Eigen::Affine3d desired_hand_pose_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_test);
-    nlayers = baxter_IK_solver.ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(desired_hand_pose_wrt_torso, path_options);
-    nlayers = path_options.size();
+    //cout<<"current hand pose: "
+    
+    //nlayers = baxter_IK_solver.ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(desired_hand_pose_wrt_torso, path_options);
+    nlayers = baxter_IK_solver.ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_wrt_torso(
+        q_test, path_options);
+    //nlayers = path_options.size();
     cout << "nlayers: " << nlayers << endl;
     cout << "path options:" << endl;
     for (int ilayer = 0; ilayer < nlayers; ilayer++) {
@@ -176,6 +231,7 @@ int main(int argc, char **argv) {
             working_on_traj = srv.response.resp;
             cout<<"no ack of new traj yet..."<<endl;
             ros::spinOnce();
+            ros::Duration(0.2).sleep();
         }
         cout<<"new traj acknowledged"<<endl;
         for (int i = 0; i < 200; i++) { // this will time out after 20 sec
@@ -198,6 +254,7 @@ int main(int argc, char **argv) {
             working_on_traj = srv.response.resp;
             cout<<"no ack of new traj yet..."<<endl;
             ros::spinOnce();
+            ros::Duration(0.2).sleep();
         }
          cout<<"new traj acknowledged"<<endl;
         //working_on_traj=true;
