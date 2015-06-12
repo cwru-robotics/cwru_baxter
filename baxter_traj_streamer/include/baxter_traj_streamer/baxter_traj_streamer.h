@@ -59,7 +59,7 @@ public:
         
     double val_from_subscriber_; //example member variable: better than using globals; convenient way to pass data from a subscriber to other member functions
     double val_to_remember_; // member variables will retain their values even as callbacks come and go
-    Vectorq7x1 q_vec_right_arm; //,q_in,q_soln,q_snapshot; 
+    Vectorq7x1 q_vec_right_arm_; //,q_in,q_soln,q_snapshot; 
     Vectorq7x1 qdot_max_vec; // velocity constraint on each joint for interpolation
     baxter_core_msgs::JointCommand right_cmd_,left_cmd_;  // define instances of these message types, to control arms    
     cwru_srv::simple_bool_service_message traj_status_srv_;

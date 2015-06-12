@@ -134,6 +134,8 @@ void Baxter_traj_streamer::map_right_arm_joint_indices(vector<string> joint_name
    cout<<endl;
 }
 
+
+//NOTE: this is not separately threaded.  this callback only responds with the parent node allows a ros spin.
 void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) {
     if (right_arm_joint_indices.size()<1) {
        //g_all_jnt_names = js_msg.name;
@@ -143,13 +145,14 @@ void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) 
     for (int i=0;i<7;i++)
     {
         // should do this better; manually remap from joint_states indices to right-arm joint angles
-        q_vec_right_arm[i] = js_msg.position[right_arm_joint_indices[i]]; //w2         
+        q_vec_right_arm_[i] = js_msg.position[right_arm_joint_indices[i]]; //w2         
     }
+    //cout<<"CB: q_vec_right_arm: "<<q_vec_right_arm_.transpose()<<endl;
     
 }  
 
 Vectorq7x1 Baxter_traj_streamer::get_qvec_right_arm() {
-    return q_vec_right_arm;
+    return q_vec_right_arm_;
 }
 
 double Baxter_traj_streamer::transition_time(Vectorq7x1 dqvec) {
@@ -310,7 +313,7 @@ void Baxter_traj_streamer::pub_right_arm_trajectory(trajectory_msgs::JointTrajec
 void Baxter_traj_streamer::pub_right_arm_trajectory_init() {
     std::vector<Vectorq7x1> qvecs;
     trajectory_msgs::JointTrajectory new_trajectory;
-    Vectorq7x1 q_snapshot = q_vec_right_arm;
+    Vectorq7x1 q_snapshot = q_vec_right_arm_;
     qvecs.push_back(q_snapshot);
     qvecs.push_back(q_snapshot);    
     stuff_trajectory(qvecs, new_trajectory);   

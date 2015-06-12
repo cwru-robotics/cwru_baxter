@@ -32,6 +32,15 @@ int main(int argc, char **argv) {
         cout << "invoking init..." << endl;
         baxter_traj_streamer.pub_right_arm_trajectory_init();   
     }
+    Vectorq7x1 r_arm_jnt_vals;
+    while(ros::ok()) {
+        r_arm_jnt_vals =  baxter_traj_streamer.get_qvec_right_arm();
+        cout<<"r arm jnts: "<<r_arm_jnt_vals.transpose()<<endl;
+        for (int i=0;i<5;i++) {
+            ros::spinOnce();
+            ros::Duration(0.1).sleep();
+        }
+    }
 
     return 0;
 
