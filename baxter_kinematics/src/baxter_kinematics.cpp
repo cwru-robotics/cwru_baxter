@@ -569,21 +569,21 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
   Eigen::Matrix3d Rdes = desired_hand_pose.linear();
   bool reachable = true;  
   while (reachable) { 
-        cout<<"try q_s0 = "<<q_s0<<endl;
+        //cout<<"try q_s0 = "<<q_s0<<endl;
         reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
         if (reachable ) {
             //test these solns:
-            cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
+            //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
             for (int i=0;i<q_solns_of_qs0.size();i++) {
                 A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
                 A_wrist = get_wrist_frame();
-                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                //std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
                 q_solns_123.push_back(q_solns_of_qs0[i]);
             }
             q_s0+= dqs0;
         }
     }
-    cout<<"found q_s0 max = "<<q_s0<<endl;
+    //cout<<"found q_s0 max = "<<q_s0<<endl;
     reachable = true;
     //now, order these in reverse, and tack on wrist solns
     for (int i=q_solns_123.size()-1; i>=0;i--)
@@ -594,26 +594,26 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
             q_solns.push_back(q_solns_w_wrist[j]); // push these on in reverse order, from q_s0_max towards q_s0_ctr
         }
     }
-    cout<<"pushed "<<q_solns.size()<<" solns in fwd search qs0"<<endl;
+    //cout<<"pushed "<<q_solns.size()<<" solns in fwd search qs0"<<endl;
     // now search in neg rot of q_s0 from center:
     q_s0 = q_s0_ctr - dqs0;
     q_solns_123.clear();
     while (reachable) { 
-        cout<<"try q_s0 = "<<q_s0<<endl;
+        //cout<<"try q_s0 = "<<q_s0<<endl;
         reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
         if (reachable ) {
             //test these solns:
-            cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
+            //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
             for (int i=0;i<q_solns_of_qs0.size();i++) {
                 A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
                 A_wrist = get_wrist_frame();
-                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                //std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
                 q_solns_123.push_back(q_solns_of_qs0[i]);
             }
             q_s0-= dqs0;
         }
     }
-    cout<<"found q_s0 min = "<<q_s0<<endl;
+    //cout<<"found q_s0 min = "<<q_s0<<endl;
     reachable = true;
     //now, tack on wrist solns and add to list of solns:
     
@@ -625,7 +625,7 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
             q_solns.push_back(q_solns_w_wrist[j]); // push these on in order, from q_s0_ctr towards q_s0_min
         }
     }       
-    cout<<"pushed "<<q_solns_123.size()<<" solns in rvrs search qs0"<<endl;      
+    //cout<<"pushed "<<q_solns_123.size()<<" solns in rvrs search qs0"<<endl;      
 return q_solns.size(); // return number of solutions found
 }
 
@@ -695,6 +695,52 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
     cout<<"found q_s0 min = "<<q_s0<<endl;
    
     //desired_hand_pose_wrt_torso
+    return path_options.size(); // should be number of q_s0 samples
+}
+
+//In this version, provide a starting pose, q_start, and compute elbow options for forward q_s0_dot rotation;
+// complementary fnc: given starting pose, compute elbow options for negative q_s0_dot rotation
+
+int Baxter_IK_solver::ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_wrt_torso(
+        Vectorq7x1 q_start, std::vector<std::vector<Eigen::VectorXd> > &path_options) {
+  Eigen::Affine3d desired_hand_pose_wrt_torso= fwd_kin_solve_wrt_torso(q_start);
+  
+    //std::vector<std::vector<Eigen::VectorXd> > path_options; 
+  Eigen::Affine3d   desired_hand_pose_wrt_rarm_mount=Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso; //related to torso via static transforms 
+  Eigen::Matrix3d   Rdes = desired_hand_pose_wrt_rarm_mount.linear();
+  //double q_s0_ctr = compute_qs0_ctr(desired_hand_pose_wrt_rarm_mount);
+  double dqs0 = DQS0; // search resolution on dq0
+  double q_s0= q_start[0]; //q_s0_ctr;
+
+    std::vector<Eigen::VectorXd>  single_layer_nodes;  
+    Eigen::VectorXd  node; 
+    int nsolns;
+    std::vector<Vectorq7x1> q_solns_of_qs0; 
+    //enforce the starting pose: only one path option
+    path_options.clear();
+    node = q_start;
+    single_layer_nodes.clear();
+    single_layer_nodes.push_back(node);
+    path_options.clear();
+    path_options.push_back(single_layer_nodes);  
+    bool reachable = true; 
+   // find solns in order from q_s0 to q_s0_max; 
+  while (reachable) { 
+        q_s0+= dqs0;
+        cout<<"try q_s0 = "<<q_s0<<endl;
+        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
+        if (nsolns==0) reachable=false;
+        if (reachable ) {
+                 single_layer_nodes.clear();            
+            for (int i=0;i<nsolns;i++) {
+                // this is annoying: can't treat std::vector<Vectorq7x1> same as std::vector<Eigen::VectorXd> 
+                node = q_solns_of_qs0[i];
+                single_layer_nodes.push_back(node);
+            }
+            path_options.push_back(single_layer_nodes);     
+        }
+    }
+ 
     return path_options.size(); // should be number of q_s0 samples
 }
 
