@@ -1,0 +1,14 @@
+baxter test, 6/12/15: raster_y test
+
+start up Baxter--wait for green halo;
+
+./baxter.sh (to set remote ROS master, in each terminal)
+
+then run these nodes:
+rosrun baxter_tools enable_robot.py -e  (enables commands)
+
+rosrun   baxter_traj_streamer    baxter_traj_interpolator_node  (executes trajectory msgs)
+
+rosrun reachability raster_move_dy  (computes raster motion and publishes trajectories)
+
+works!
