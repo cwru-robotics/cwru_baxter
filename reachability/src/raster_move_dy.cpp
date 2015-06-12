@@ -14,7 +14,15 @@
 //#include <stdlib.h>     /* srand, rand */
 //#include <time.h>       /* time */
 using namespace std;
+#define VECTOR_DIM 7 // e.g., a 7-dof vector
 
+void reversePathFnc(std::vector<Eigen::VectorXd> fwd_path, std::vector<Eigen::VectorXd> &rvrs_path) {
+    int npts = fwd_path.size();
+    rvrs_path.clear();
+    for (int i = npts - 1; i >= 0; i--) {
+        rvrs_path.push_back(fwd_path[i]);
+    }
+}
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "baxter_raster_dy");
@@ -29,7 +37,10 @@ int main(int argc, char **argv) {
     Baxter_IK_solver baxter_IK_solver; // instantiate an IK solver
     ROS_INFO("main: instantiating an object of type Baxter_traj_streamer");
     Baxter_traj_streamer baxter_traj_streamer(&nh);  //instantiate a Baxter_traj_streamer object and pass in pointer to nodehandle for constructor to use  
-
+    cwru_srv::simple_bool_service_message srv;
+    ros::ServiceClient traj_interp_stat_client = nh.serviceClient<cwru_srv::simple_bool_service_message>("trajInterpStatusSvc");
+   
+    
     b_des<<0,0,-1;
     n_des<<1,0,0;
     t_des = b_des.cross(n_des);
@@ -41,7 +52,7 @@ int main(int argc, char **argv) {
     
     Eigen::Affine3d a_tool_des; // expressed in torso frame
     
-    int nlayers;
+    
     std::vector<std::vector<Eigen::VectorXd> > path_options;    
         path_options.clear();
     std::vector<Eigen::VectorXd>  single_layer_nodes;  
@@ -66,7 +77,8 @@ int main(int argc, char **argv) {
     double dy_des = 0.1;
     
     //find how many values nx,ny in search range
-    for (double x_des = x_min; x_des<x_max; x_des+=dx_des) nx++;
+    //for (double x_des = x_min; x_des<x_max; x_des+=dx_des) nx++;
+    nx=1;
     for (double y_des=y_min; y_des<y_max; y_des+= dy_des) ny++;
     cout<<"discretized search into nx = "<<nx<<", ny= "<<ny<<endl;
     int nsolns_matrix[nx][ny];
@@ -75,7 +87,10 @@ int main(int argc, char **argv) {
     int ix=0;
     int iy=0;
 
-    for (double x_des = x_min; x_des<x_max; x_des+=dx_des) {
+    //for (double x_des = x_min; x_des<x_max; x_des+=dx_des) 
+    
+    double    x_des = x_min;
+    {
         std::cout<<std::endl;
         std::cout<<"x="<< round(x_des*10)<<"  ";
        
@@ -84,7 +99,7 @@ int main(int argc, char **argv) {
            p[1] = y_des;
             a_tool_des.translation()=p;
             nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_tool_des,q_solns);
-            std::cout<<nsolns;
+            //std::cout<<nsolns;
             nsolns_matrix[ix][iy]=nsolns;
             iy++;
             single_layer_nodes.clear();
@@ -96,7 +111,7 @@ int main(int argc, char **argv) {
             }
 
             path_options.push_back(single_layer_nodes); 
-            cout<<"y = "<<y_des<<"; pushed "<<nsolns<<"solutions onto path_options"<<endl;
+            cout<<"y = "<<y_des<<"; pushed "<<nsolns<<" solutions onto path_options"<<endl;
         }
         ix++;
         iy=0;
@@ -104,7 +119,8 @@ int main(int argc, char **argv) {
     //display the matrix:
     cout<<endl;
     cout<<"x/y: ";
-    int xval,yval;    
+    int xval,yval; 
+    ix=0;
     for (int iy=ny-1;iy>=0;iy--) {
         yval = round((y_min+iy*dy_des)*100);
         if (abs(yval)<100) cout<<" ";
@@ -114,9 +130,11 @@ int main(int argc, char **argv) {
     }
     cout<<endl;
 
-    for (int ix=nx-1;ix>=0;ix--) {
+    //for (int ix=nx-1;ix>=0;ix--) 
+    {
         // print out the x value as a column...in cm
-        xval = round((x_min+ix*dx_des)*100);
+        //xval = round((x_min+ix*dx_des)*100);
+        xval = round(x_min*100); 
         if (abs(xval)<100) cout<<" ";
         if (abs(xval)<10)  cout<<" ";
         if (xval>-1)  cout<<" ";
@@ -130,6 +148,111 @@ int main(int argc, char **argv) {
             cout<<nsolns<<" ";
         }
         cout<<endl;
+    }
+    
+    //plan a path through the options:
+    int nlayers = path_options.size();
+    if (nlayers < 1) 
+    { ROS_WARN("no viable options: quitting");
+     
+        return 0; // give up if no options
+     }   
+    std::vector<Eigen::VectorXd> optimal_path, rvrs_path;
+    optimal_path.resize(nlayers);
+    double trip_cost;
+    Eigen::VectorXd weights;
+    weights.resize(VECTOR_DIM);
+    for (int i = 0; i < VECTOR_DIM; i++) {
+        weights(i) = 1.0;
+    }
+
+
+
+    cout << "instantiating a JointSpacePlanner:" << endl;
+    { //limit the scope of jsp here:
+        JointSpacePlanner jsp(path_options, weights);
+        cout << "recovering the solution..." << endl;
+        jsp.get_soln(optimal_path);
+        trip_cost = jsp.get_trip_cost();
+
+    }
+
+    //now, jsp is deleted, but optimal_path lives on:
+    cout << "resulting solution path: " << endl;
+    for (int ilayer = 0; ilayer < nlayers; ilayer++) {
+        cout << "ilayer: " << ilayer << " node: " << optimal_path[ilayer].transpose() << endl;
+    }
+    cout << "soln min cost: " << trip_cost << endl;
+    //return 0;
+
+    cout << "defining a reverse path" << endl;
+    reversePathFnc(optimal_path, rvrs_path);
+    for (int ilayer = 0; ilayer < nlayers; ilayer++) {
+        cout << "ilayer: " << ilayer << " node: " << rvrs_path[ilayer].transpose() << endl;
+    }
+
+
+
+    trajectory_msgs::JointTrajectory new_trajectory, rvrs_trajectory; // an empty trajectory
+    cout<<"stuffing traj for forward path: "<<endl;
+    baxter_traj_streamer.stuff_trajectory(optimal_path, new_trajectory); //convert from vector of 7dof poses to trajectory message
+    cout<<"stuffing traj for reverse path: "<<endl;
+    baxter_traj_streamer.stuff_trajectory(rvrs_path, rvrs_trajectory); //convert from vector of 7dof poses to trajectory message
+    
+    
+        ROS_INFO("warming up the command listener...");
+    for (int i = 0; i < 10; i++) {
+        baxter_traj_streamer.pub_right_arm_trajectory_init();
+        ros::spinOnce();
+        ros::Duration(0.1).sleep();
+    }
+
+
+    bool working_on_traj = false;
+    while (ros::ok()) { //while ROS is okay...
+        cout << "sending fwd traj..." << endl;
+        baxter_traj_streamer.pub_right_arm_trajectory(new_trajectory); //add timing and publish the traj message
+        while(!working_on_traj) {
+           traj_interp_stat_client.call(srv); // communicate w/ trajectory interpolator node status service
+            working_on_traj = srv.response.resp;
+            cout<<"no ack of new traj yet..."<<endl;
+            ros::spinOnce();
+        }
+        cout<<"new traj acknowledged"<<endl;
+        for (int i = 0; i < 200; i++) { // this will time out after 20 sec
+            ros::Duration(0.1).sleep(); //Wait dt
+            traj_interp_stat_client.call(srv); // communicate w/ trajectory interpolator node status service
+            working_on_traj = srv.response.resp;
+            ros::spinOnce();
+            if (!working_on_traj) {
+                cout << "svc says done w/ traj..." << endl;
+                break; 
+            }
+        }
+        //now go back again...
+        
+        cout << "sending reverse traj: " << endl;       
+        baxter_traj_streamer.pub_right_arm_trajectory(rvrs_trajectory); //add timing and publish the traj message
+        working_on_traj= false;
+        while(!working_on_traj) { // wait for ack
+           traj_interp_stat_client.call(srv); // communicate w/ trajectory interpolator node status service
+            working_on_traj = srv.response.resp;
+            cout<<"no ack of new traj yet..."<<endl;
+            ros::spinOnce();
+        }
+         cout<<"new traj acknowledged"<<endl;
+        //working_on_traj=true;
+        for (int i = 0; i < 200; i++) { // this will time out after 20 sec
+            ros::Duration(0.1).sleep(); //Wait dt
+            traj_interp_stat_client.call(srv); // communicate w/ trajectory interpolator node status service
+            working_on_traj = srv.response.resp;
+            ros::spinOnce();
+            if (!working_on_traj) {
+                cout << "svc says done w/ traj..." << endl;
+                break; 
+            }
+        }
+
     }
 
     return 0;

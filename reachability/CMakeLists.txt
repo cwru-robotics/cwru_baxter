@@ -21,7 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 include_directories(
   ${Eigen_INCLUDE_DIRS}
-  ${PROJECT_NAME}/include
+  #${PROJECT_NAME}/include
   #${baxter_kinematics_INCLUDE_DIRS}
 )
 add_definitions(${EIGEN_DEFINITIONS})
@@ -102,7 +102,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 #  CATKIN_DEPENDS Eigen baxter_core_msgs baxter_kinematics cwru_joint_space_planner cwru_srv roscpp sensor_msgs trajectory_msgs
 #  DEPENDS system_lib
 catkin_package(
-  INCLUDE_DIRS include 
+  #INCLUDE_DIRS include 
   LIBRARIES ${PROJECT_NAME} cwru_joint_space_planner
   CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv
   DEPENDS eigen system_lib
@@ -117,7 +117,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-  include
+  #include
   ${catkin_INCLUDE_DIRS}
 )
 
