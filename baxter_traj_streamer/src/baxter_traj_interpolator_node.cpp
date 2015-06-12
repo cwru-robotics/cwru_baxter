@@ -170,6 +170,8 @@ int main(int argc, char** argv){
           cmd_pose_right(qvec_new); // use qvec to populate object and send it to robot
           qvec_prev = qvec_new;
           cout<<"traj_clock: "<<traj_clock<<"; vec:"<<qvec_new.transpose()<<endl;
+          if (!working_on_trajectory)
+              cout<<"completed execution of a trajectory"<<endl;
       }
     ros::spinOnce();
     ros::Duration(dt_traj).sleep();
