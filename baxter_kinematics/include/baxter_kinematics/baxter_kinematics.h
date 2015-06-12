@@ -14,6 +14,8 @@
 #include <Eigen/Dense>
 #include <string>
 #include <math.h>
+#include <cwru_srv/simple_bool_service_message.h> // this is a pre-defined service message, contained in shared "cwru_srv" package
+
 
 typedef Eigen::Matrix<double, 6, 1> Vectorq6x1;
 typedef Eigen::Matrix<double, 7, 1> Vectorq7x1;

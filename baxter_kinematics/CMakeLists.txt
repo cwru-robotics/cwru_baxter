@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   tf
+  cwru_srv
 )
 include_directories(
   ${Eigen_INCLUDE_DIRS}
@@ -91,7 +92,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 catkin_package(
   INCLUDE_DIRS include 
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs tf baxter_core_msgs
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs tf baxter_core_msgs cwru_srv
   DEPENDS eigen system_lib
 )
 

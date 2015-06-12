@@ -530,20 +530,20 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const&
     int nsolns=0;  
     bool reachable;
     reachable = compute_q123_solns(desired_hand_pose_wrt_arm_mount, q_s0, q_solns_of_qs0);    
-    cout<<"ik_solve_approx_wrt_torso_given_qs0 num solns: "<<q_solns_of_qs0.size()<<endl;
+    //cout<<"ik_solve_approx_wrt_torso_given_qs0 num solns: "<<q_solns_of_qs0.size()<<endl;
  
     //now, compute corresponding wrist solns and add successful results to list of 7dof solns:   
     for (int i=0; i< q_solns_of_qs0.size(); i++)
     {
         q_soln = q_solns_of_qs0[i];
-        cout<<"q_soln123: "<<q_soln.transpose()<<endl;
+        //cout<<"q_soln123: "<<q_soln.transpose()<<endl;
         solve_spherical_wrist(q_soln,Rdes, q_solns_w_wrist); 
         for (int j=0;j<q_solns_w_wrist.size();j++) {
             q_solns.push_back(q_solns_w_wrist[j]); // push these on in order, from q_s0_ctr towards q_s0_min
-            cout<<"q_solnw: "<<q_solns_w_wrist[j].transpose()<<endl;
+            //cout<<"q_solnw: "<<q_solns_w_wrist[j].transpose()<<endl;
         }
     }          
-    cout<<"there are "<<q_solns.size()<<" solutions with wrist options"<<endl;
+    //cout<<"there are "<<q_solns.size()<<" solutions with wrist options"<<endl;
     return q_solns.size(); // return number of solutions found            
 }
 
@@ -651,7 +651,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
    bool reachable = true; 
    // find solns in order from q_s0 to q_s0_max; reorder these solns later
   while (reachable) { 
-        cout<<"try q_s0 = "<<q_s0<<endl;
+        //cout<<"try q_s0 = "<<q_s0<<endl;
         nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
@@ -665,21 +665,21 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
             q_s0+= dqs0;
         }
     }
-    cout<<"found q_s0 max = "<<q_s0<<endl;   
+    //cout<<"found q_s0 max = "<<q_s0<<endl;   
     
     //now, order these in reverse
     for (int i=path_options_reverse.size()-1; i>=0;i--)
     {
         path_options.push_back(path_options_reverse[i]);
     }
-    cout<<"pushed "<<path_options_reverse.size()<<" solns in fwd search qs0"<<endl;
+    //cout<<"pushed "<<path_options_reverse.size()<<" solns in fwd search qs0"<<endl;
     
       // now search in neg rot of q_s0 from center:
     reachable = true; 
 
     q_s0 = q_s0_ctr - dqs0;
     while (reachable) { 
-        cout<<"try q_s0 = "<<q_s0<<endl;
+        //cout<<"try q_s0 = "<<q_s0<<endl;
         nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
@@ -692,7 +692,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
             q_s0-= dqs0;
         }
     }
-    cout<<"found q_s0 min = "<<q_s0<<endl;
+    //cout<<"found q_s0 min = "<<q_s0<<endl;
    
     //desired_hand_pose_wrt_torso
     return path_options.size(); // should be number of q_s0 samples
@@ -727,7 +727,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_
    // find solns in order from q_s0 to q_s0_max; 
   while (reachable) { 
         q_s0+= dqs0;
-        cout<<"try q_s0 = "<<q_s0<<endl;
+        //cout<<"try q_s0 = "<<q_s0<<endl;
         nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
@@ -773,12 +773,12 @@ double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_hand_
             w_approx = get_wrist_coords_wrt_frame1(q123_precise);
             w_err = wrist_pt_wrt_right_arm_frame1-w_approx;
             w_err_norm = w_err.norm();
-            cout<<"iter "<<jiter<<"; w_err_norm = "<<w_err_norm<< "; w_err =  "<<w_err.transpose()<<endl;
+            //cout<<"iter "<<jiter<<"; w_err_norm = "<<w_err_norm<< "; w_err =  "<<w_err.transpose()<<endl;
             dq123 = Jw3x3_inv*w_err;
             if (dq123.norm()> DQ_ITER_MAX) {
                 dq123/=DQ_ITER_MAX; //protect against numerical instability
             }
-            cout<<"dq123: "<<dq123.transpose()<<endl;
+            //cout<<"dq123: "<<dq123.transpose()<<endl;
             for (int i=1;i<4;i++) {
                 q123_precise[i]+=dq123[i-1];
             }
@@ -795,17 +795,17 @@ double  Baxter_IK_solver::compute_qs0_ctr(Eigen::Affine3d const& desired_hand_po
     Vectorq7x1 soln1_vec;
     soln1_vec(0)=0.0;
     w_wrt_1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);
-    cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0=0 "<<w_wrt_1.transpose()<<endl;    
+    //cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0=0 "<<w_wrt_1.transpose()<<endl;    
     double r_perp = sqrt(w_wrt_1(1)*w_wrt_1(1)+w_wrt_1(0)*w_wrt_1(0));
     double q_s0_ctr = atan2(w_wrt_1(2),r_perp);
     //TEST:
-    cout<<"q_s0_ctr="<<q_s0_ctr<<endl;
+    //cout<<"q_s0_ctr="<<q_s0_ctr<<endl;
     soln1_vec(0)=q_s0_ctr;
     
     //reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns);    
     //recompute w_wrt_1 using q_s0_ctr--intend for w_z = 0 at this pose
     w_wrt_1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);   
-    cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0_ctr: "<<w_wrt_1.transpose()<<endl;
+    //cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0_ctr: "<<w_wrt_1.transpose()<<endl;
     
     return q_s0_ctr;
 }
@@ -843,13 +843,13 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
     //solve for q_elbow;
     reachable= solve_for_elbow_ang(wrist_pt_wrt_right_arm_frame1, q_elbow);  
     if (!reachable) {
-        ROS_WARN("compute_q123_solns: solve_for_elbow_ang returned false");
+        //ROS_WARN("compute_q123_solns: solve_for_elbow_ang returned false");
         return false; // give up--point is out of reach--regardless of joint limits
     }
     
     does_fit = fit_q_to_range(q_lower_limits[3],q_upper_limits[3],q_elbow); // confirm q_elbow is within joint limits
     if (!does_fit) {
-        cout<< "compute_q123_solns: elbow soln out of range; quitting"<<endl;
+        //cout<< "compute_q123_solns: elbow soln out of range; quitting"<<endl;
         return false; //give up--elbow angle solution is unreachable
     } 
     
@@ -860,7 +860,7 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
     // next, see if we can get humerus solutions:
     reachable = solve_for_humerus_ang(wrist_pt_wrt_right_arm_frame1,q_elbow, q_humerus); //expect 2 q_humerus values
     if (!reachable) {
-        cout<<"compute_q123_solns: not reachable w/ humerus soln; quitting"<<endl;
+        //cout<<"compute_q123_solns: not reachable w/ humerus soln; quitting"<<endl;
         return false; // give up--point is out of reach w/rt q_humerus--regardless of joint limits
     }
     soln1_vec[2] = q_humerus[0]; // save these 2 potential solns
@@ -873,22 +873,22 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
         //cout<<"q_humerus[0] is in range: "<<q_humerus[0]<<endl;
         //solve for q_shoulder_elevation
         reachable = solve_for_s1_ang(wrist_pt_wrt_right_arm_frame1,q_elbow,  q_humerus[0], q_s1_temp);
-        cout<<"testing q_s1 = "<<q_s1_temp<<endl;
+        //cout<<"testing q_s1 = "<<q_s1_temp<<endl;
         if (reachable) { //got a soln for q_s1...but is it in joint range?
             if (fit_q_to_range(q_lower_limits[1],q_upper_limits[1],q_s1_temp)) {
                 //if here, then we have a complete, legal soln; push it onto the soln vector
                 soln1_vec[1] = q_s1_temp;
                 q_solns.push_back(soln1_vec);
                 at_least_one_valid_soln = true;
-                cout<<"soln vec: "<<soln1_vec.transpose()<<endl;
+                //cout<<"soln vec: "<<soln1_vec.transpose()<<endl;
             }      
 
-        else {  cout<<"qs1 soln not in joint range"<<endl;
+        else {  //cout<<"qs1 soln not in joint range"<<endl;
                 } 
         }
     }
     else {
-        cout<<"q_humerus[0] is out of range: "<<q_humerus[0]<<endl;
+        //cout<<"q_humerus[0] is out of range: "<<q_humerus[0]<<endl;
     }
     // repeat for 2nd q_humerus soln:
     does_fit = fit_q_to_range(q_lower_limits[2],q_upper_limits[2],q_humerus[1]); // confirm q_humerus is within joint limits
@@ -897,22 +897,22 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
         //cout<<"q_humerus[1] is in range: "<<q_humerus[1]<<endl;
         //solve for q_shoulder_elevation
         reachable = solve_for_s1_ang(wrist_pt_wrt_right_arm_frame1,q_elbow,  q_humerus[1], q_s1_temp);
-        cout<<"testing q_s1 = "<<q_s1_temp<<endl;
+        //cout<<"testing q_s1 = "<<q_s1_temp<<endl;
         if (reachable) { //got a soln for q_s1...but is it in joint range?
             if (fit_q_to_range(q_lower_limits[1],q_upper_limits[1],q_s1_temp)) {
                 //if here, then we have a complete, legal soln; push it onto the soln vector
                 soln2_vec[1] = q_s1_temp;
                 q_solns.push_back(soln2_vec);
                 at_least_one_valid_soln = true;
-                cout<<"soln vec: "<<soln2_vec.transpose()<<endl;
+                //cout<<"soln vec: "<<soln2_vec.transpose()<<endl;
             }      
             else {
-                cout<<"qs1 soln not in joint range"<<endl;
+                //cout<<"qs1 soln not in joint range"<<endl;
             }
         }        
     }    
     else  {
-        cout<<"q_humerus[1] is out of range: "<<q_humerus[1]<<endl;  
+        //cout<<"q_humerus[1] is out of range: "<<q_humerus[1]<<endl;  
     }
               
     return at_least_one_valid_soln; //give up--elbow angle solution is unreachable   
@@ -925,7 +925,7 @@ bool Baxter_IK_solver::solve_for_elbow_ang(Eigen::Vector3d w_wrt_1,double &q_elb
     //cout<<"r_goal: "<<r_goal<<endl;
     double acos_arg = (L_humerus*L_humerus + L_forearm*L_forearm - r_goal*r_goal)/(2.0*L_humerus*L_forearm);
     if ((fabs(acos_arg)>1.0)||(r_goal>r_goal_max)) {
-        ROS_WARN("solve_for_elbow_ang beyond safe reach;  acos_arg = %f; r_goal = %f",acos_arg,r_goal);
+        //ROS_WARN("solve_for_elbow_ang beyond safe reach;  acos_arg = %f; r_goal = %f",acos_arg,r_goal);
         return false;
     }
     //cout<<"acos_arg: "<<acos_arg<<endl;
@@ -961,7 +961,7 @@ bool Baxter_IK_solver::solve_for_humerus_ang(Eigen::Vector3d w_wrt_1,double q_el
 
     //ROS_INFO("z_offset des = %f; r_arm = %f",z_offset,r_arm);
     if (fabs(z_offset)>r_arm) {
-        ROS_WARN("no humerus solution: |z_offset| > r_arm ");
+        //ROS_WARN("no humerus solution: |z_offset| > r_arm ");
         return false;
     }
     q_humerus[0] = asin(z_offset/r_arm);
@@ -996,7 +996,7 @@ bool Baxter_IK_solver::solve_for_s1_ang(Eigen::Vector3d w_wrt_1,double q_elbow, 
 
     if (Lw_sqd<0)
     {
-        ROS_WARN("solve_for_s1_ang: Lw negative! no soln");
+        //ROS_WARN("solve_for_s1_ang: Lw negative! no soln");
         return false;
     }
     double Lw = sqrt(Lw_sqd);
@@ -1015,7 +1015,7 @@ bool Baxter_IK_solver::solve_for_s1_ang(Eigen::Vector3d w_wrt_1,double q_elbow, 
     //now, have rtemp*cos(q-alpha) = c
     double cos_of_arg = c/rtemp;
     if (fabs(cos_of_arg)>1.0) {
-        ROS_WARN("solve_for_s1_ang: logic problem w/ alpha");
+        //ROS_WARN("solve_for_s1_ang: logic problem w/ alpha");
         return false;
     }
     double ang_arg = acos(cos_of_arg);
@@ -1197,7 +1197,7 @@ bool Baxter_IK_solver::update_spherical_wrist(Vectorq7x1 q_in,Eigen::Matrix3d R_
         q_precise = q_solns[0];
         double err = (q_in - q_precise).norm();
         if (err> 1.0) //arbitrary threshold; should put in header
-        {  ROS_WARN("update_spherical_wrist: likely poor fit");
+        {  //ROS_WARN("update_spherical_wrist: likely poor fit");
         return false;
         }
     }
