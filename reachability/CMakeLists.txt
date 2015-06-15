@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   trajectory_msgs
   std_msgs
+  visualization_msgs
 )
 
 include_directories(
@@ -104,7 +105,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 catkin_package(
   #INCLUDE_DIRS include 
   LIBRARIES ${PROJECT_NAME} cwru_joint_space_planner
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv visualization_msgs
   DEPENDS eigen system_lib
 )
 
@@ -129,7 +130,9 @@ include_directories(
 ## Declare a cpp executable
 # add_executable(reachability_node src/reachability_node.cpp)
 add_executable(reachability_from_above src/reachability_from_above.cpp)
+add_executable(reachability_from_above_v2 src/reachability_from_above_v2.cpp)
 add_executable(raster_move_dy src/raster_move_dy.cpp)
+add_executable(cartesian_move_fixed_R src/cartesian_move_fixed_R.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(reachability_node reachability_generate_messages_cpp)
@@ -139,7 +142,9 @@ add_executable(raster_move_dy src/raster_move_dy.cpp)
 #   ${catkin_LIBRARIES}
 # )
 target_link_libraries(reachability_from_above ${catkin_LIBRARIES})
+target_link_libraries(reachability_from_above_v2 ${catkin_LIBRARIES})
 target_link_libraries(raster_move_dy ${catkin_LIBRARIES})
+target_link_libraries(cartesian_move_fixed_R ${catkin_LIBRARIES})
 #############
 ## Install ##
 #############

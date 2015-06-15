@@ -101,25 +101,29 @@ int main(int argc, char **argv) {
     double x_des = x_min;
     {
         std::cout << std::endl;
-        std::cout << "x=" << round(x_des * 10) << "  ";
+        std::cout << "x=" << x_des<<endl; //round(x_des * 10) << "  ";
 
         for (double y_des = y_min; y_des < y_max; y_des += dy_des) {
             p[0] = x_des;
             p[1] = y_des;
+            p[2] = z_des;
             a_tool_des.translation() = p;
+             cout<<"trying: ("<<p[0]<<","<<p[1]<<","<<p[2]<<"):  "<<endl;
             nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_tool_des, q_solns);
-            //std::cout<<nsolns;
+            std::cout<<"nsolns = "<<nsolns<<endl;
             nsolns_matrix[ix][iy] = nsolns;
             iy++;
             single_layer_nodes.clear();
-            single_layer_nodes.resize(nsolns);
-            for (int isoln = 0; isoln < nsolns; isoln++) {
-                // this is annoying: can't treat std::vector<Vectorq7x1> same as std::vector<Eigen::VectorXd> 
-                node = q_solns[isoln];
-                single_layer_nodes[isoln] = node;
-            }
+            if (nsolns>0) {
+                single_layer_nodes.resize(nsolns);
+                for (int isoln = 0; isoln < nsolns; isoln++) {
+                    // this is annoying: can't treat std::vector<Vectorq7x1> same as std::vector<Eigen::VectorXd> 
+                    node = q_solns[isoln];
+                    single_layer_nodes[isoln] = node;
+                }
 
-            path_options.push_back(single_layer_nodes);
+                path_options.push_back(single_layer_nodes);
+            }
             cout << "y = " << y_des << "; pushed " << nsolns << " solutions onto path_options" << endl;
         }
         ix++;
@@ -206,7 +210,10 @@ int main(int argc, char **argv) {
     cout << "stuffing traj for reverse path: " << endl;
     baxter_traj_streamer.stuff_trajectory(rvrs_path, rvrs_trajectory); //convert from vector of 7dof poses to trajectory message
 
-
+    int ans;
+    cout<<"enter 1 to execute raster motion; 0 to quit: ";
+    cin>>ans;
+    if (ans!=1) return 0;
     //prepare to execute the above trajectories
     //make sure robot is listening; sends first command equal to current joint angles, repeating for 10 iterations over 1 second
     ROS_INFO("warming up the command listener...");
