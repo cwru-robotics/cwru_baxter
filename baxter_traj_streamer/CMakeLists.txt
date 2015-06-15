@@ -151,6 +151,8 @@ add_executable(elbow_orbit_plan_main src/elbow_orbit_plan_main.cpp)
 add_executable(elbow_orbit_plan_main2 src/elbow_orbit_plan_main2.cpp)
 add_executable(test_init_cmd src/test_init_cmd_main.cpp)
 add_executable(traj_interpolator_as src/traj_interpolator_as.cpp)
+add_executable(traj_action_client src/traj_action_client.cpp)
+add_executable(traj_action_client_pre_pose src/traj_action_client_pre_pose.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(baxter_traj_streamer_node baxter_traj_streamer_generate_messages_cpp)
@@ -167,6 +169,8 @@ target_link_libraries(elbow_orbit_plan_main baxter_traj_streamer  ${catkin_LIBRA
 target_link_libraries(elbow_orbit_plan_main2 baxter_traj_streamer  ${catkin_LIBRARIES})
 target_link_libraries(test_init_cmd baxter_traj_streamer  ${catkin_LIBRARIES})
 target_link_libraries(traj_interpolator_as baxter_traj_streamer  ${catkin_LIBRARIES})
+target_link_libraries(traj_action_client  ${catkin_LIBRARIES})
+target_link_libraries(traj_action_client_pre_pose baxter_traj_streamer ${catkin_LIBRARIES})
 #cwru_joint_space_planner
 #############
 ## Install ##
