@@ -556,6 +556,7 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const&
 int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns) // given desired hand pose, find all viable IK solns
 { 
   double q_s0_ctr = compute_qs0_ctr(desired_hand_pose);
+  //cout<<"ik_solve_approx: q_s0_ctr = "<<q_s0_ctr<<endl;
   double dqs0 = DQS0; // search resolution on dq0
   double  q_s0 = q_s0_ctr;
   std::vector<Vectorq7x1> q_solns_123, q_solns_of_qs0, q_solns_w_wrist;
@@ -571,13 +572,17 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
   while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
         reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        
         if (reachable ) {
             //test these solns:
             //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
+            //cout<<"num solns at q_s0 = "<<q_solns_of_qs0.size()<<endl;
             for (int i=0;i<q_solns_of_qs0.size();i++) {
+                /*
                 A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
                 A_wrist = get_wrist_frame();
-                //std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                  */
                 q_solns_123.push_back(q_solns_of_qs0[i]);
             }
             q_s0+= dqs0;
@@ -605,9 +610,11 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
             //test these solns:
             //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
             for (int i=0;i<q_solns_of_qs0.size();i++) {
+                /*
                 A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
                 A_wrist = get_wrist_frame();
-                //std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                 * */
                 q_solns_123.push_back(q_solns_of_qs0[i]);
             }
             q_s0-= dqs0;
@@ -617,6 +624,7 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
     reachable = true;
     //now, tack on wrist solns and add to list of solns:
     
+    //cout<<"solving for spherical wrist solns..."<<endl;
     for (int i=0; i< q_solns_123.size(); i++)
     {
         q_soln = q_solns_123[i];
@@ -625,7 +633,7 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
             q_solns.push_back(q_solns_w_wrist[j]); // push these on in order, from q_s0_ctr towards q_s0_min
         }
     }       
-    //cout<<"pushed "<<q_solns_123.size()<<" solns in rvrs search qs0"<<endl;      
+    //cout<<"pushed "<<q_solns.size()<<" total solns in search over qs0"<<endl;      
 return q_solns.size(); // return number of solutions found
 }
 
@@ -835,7 +843,16 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
     bool reachable=false;
     bool at_least_one_valid_soln = false;
     Eigen::Vector3d wrist_pt_wrt_right_arm_frame1; 
-    
+    /* constrain q_s0 limits */
+    if (q_s0>q_upper_limits[0]) {
+        //cout<<"q_s0 too large"<<endl;
+        return false;
+    }
+    if (q_s0<q_lower_limits[0]) {
+        //cout<<"q_s0 too negative"<<endl;
+        return false;
+    }   
+
     //given desired hand pose, compute the approximate wrist point coordinates, and express these w/rt frame 1 (s1 frame)
     wrist_pt_wrt_right_arm_frame1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);
     //cout<< "compute_q123_solns: w w/rt frame1 from fwd kin code: "<<wrist_pt_wrt_right_arm_frame1.transpose()<<endl;    
@@ -1015,7 +1032,7 @@ bool Baxter_IK_solver::solve_for_s1_ang(Eigen::Vector3d w_wrt_1,double q_elbow, 
     //now, have rtemp*cos(q-alpha) = c
     double cos_of_arg = c/rtemp;
     if (fabs(cos_of_arg)>1.0) {
-        //ROS_WARN("solve_for_s1_ang: logic problem w/ alpha");
+        ROS_WARN("solve_for_s1_ang: logic problem w/ alpha");
         return false;
     }
     double ang_arg = acos(cos_of_arg);
@@ -1060,6 +1077,8 @@ bool Baxter_IK_solver::solve_for_s1_ang(Eigen::Vector3d w_wrt_1,double q_elbow, 
     cout<<"A_15(q_s1,q_humerus,q_elbow) = "<<endl;
     cout<<A_15<<endl;   
      * */ 
+    //return that we have a valid soln:
+    return true;
 }
 
     

@@ -146,6 +146,21 @@ got this to compile--but still need to develop the logic.  Want to:
 *publish this trajectory to get streamer node to execute it 
 
 
+----6/8---
+added a service to traj streamer node; need to test it w/ elbow orbit node;
+added cwru_srv to this repo
+added reverse path to elbow orbit example, so arm will go back and forth
+next: add service client to check when streamer is done;
+ALSO: get arm jumps when streamer begins motion; need to ramp up velocity
+
+---6/11---
+start reachability package
+depend on: roscpp Eigen baxter_core_msgs sensor_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv
+
+borrowed reachability code from irb120;
+got some results--need to evaluate
+try doing a planned raster move at z=0, x = 0.4m, y from 0.3 to -0.9
+
 
 
 
