@@ -24,23 +24,52 @@ void doneCb(const actionlib::SimpleClientGoalState& state,
     ROS_INFO("got return val = %d; traj_id = %d",result->return_val,result->traj_id);
 }
 
+
 int main(int argc, char** argv) {
         ros::init(argc, argv, "traj_action_client_node"); // name this node 
         ros::NodeHandle nh; //standard ros node handle        
         int g_count = 0;
-    Eigen::VectorXd q_in;
-    q_in << 0, 0, 0, 0, 0, 0, 0;
+                int ans;
+    Vectorq7x1 q_pre_pose;
+    //q_in << 0, 0, 0, 0, 0, 0, 0;  
+    q_pre_pose<< -0.907528, -0.111813,   2.06622,    1.8737,    -1.295,   2.00164,  -2.87179;
+    Eigen::VectorXd q_in_vecxd;
+    Vectorq7x1 q_vec_right_arm;
+       
+  
        std::vector<Eigen::VectorXd> des_path;
-       des_path.push_back(q_in); //put all zeros here
-       des_path.push_back(q_in); //twice, to define a trajectory
-        trajectory_msgs::JointTrajectory des_trajectory; // an empty trajectory 
-    Baxter_traj_streamer baxter_traj_streamer(&nh); //instantiate a Baxter_traj_streamer object and pass in pointer to nodehandle for constructor to use  
+        // cout<<"creating des_path vector; enter 1:";
+        //cin>>ans;
         
+
+        trajectory_msgs::JointTrajectory des_trajectory; // an empty trajectory 
+        cout<<"instantiating a traj streamer"<<endl; // enter 1:";
+        //cin>>ans;
+    Baxter_traj_streamer baxter_traj_streamer(&nh); //instantiate a Baxter_traj_streamer object and pass in pointer to nodehandle for constructor to use  
+    // warm up the joint-state callbacks;
+    cout<<"warming up callbacks..."<<endl;
+    for (int i=0;i<100;i++) {
+        ros::spinOnce();
+        //cout<<"spin "<<i<<endl;
+        ros::Duration(0.01).sleep();
+    }
+    cout<<"getting current right-arm pose:"<<endl;
+    q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm();  
+    cout<<"r_arm state:"<<q_vec_right_arm.transpose()<<endl;    
+    q_in_vecxd = q_vec_right_arm; // start from here;
+    des_path.push_back(q_in_vecxd); //put all zeros here
+    q_in_vecxd = q_pre_pose; // conversion; not sure why I needed to do this...but des_path.push_back(q_in_vecxd) likes it
+    des_path.push_back(q_in_vecxd); //twice, to define a trajectory  
+    
+
     cout << "stuffing traj: " << endl;
     baxter_traj_streamer.stuff_trajectory(des_path, des_trajectory); //convert from vector of 7dof poses to trajectory message        
         // here is a "goal" object compatible with the server, as defined in example_action_server/action
         baxter_traj_streamer::trajGoal goal; 
-        
+        // does this work?  copy traj to goal:
+        goal.trajectory = des_trajectory;
+        //cout<<"ready to connect to action server; enter 1: ";
+        //cin>>ans;
         // use the name of our server, which is: trajActionServer (named in traj_interpolator_as.cpp)
         actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> action_client("trajActionServer", true);
         
@@ -75,7 +104,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         else {
-            ROS_INFO("finished before timeou");
+            ROS_INFO("finished before timeout");
         }
         
         //}
