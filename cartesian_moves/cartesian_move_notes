@@ -1,0 +1,76 @@
+make a cartesian-move action server, specialized for gripper-down orientation
+
+this action server accepts a goal consisting of a Cartesian destination, x,y,z of the tool flange,
+ and imposes gripper orientation down.
+
+has an action client of interpolator action server;
+
+goal input is simply 3 coords (origin of tool flange) and scalar speed (m/s)
+this action server assumes current pose as starting position (joint-space constraint),
+ does fk to get current flange position, 
+ imposes assumed orientation (down),
+ interpolates in Cartesian space (optionally, w/ speed arg?)
+ solves IK options
+ plans a path using stagecoach planner
+ 
+aborts if: not reachable along path
+       OR: joint-space optimal soln has large jumps
+
+else: stuffs a trajectory w/ optimal joint-space path;
+      sends this trajectory as a goal message to interpolator action server
+      returns "success" if interpolator declares success (else "abort")
+
+---------------how to test-------------
+1) start baxter simulator (and enable the controller: rosrun baxter_tools enable_robot.py -e)
+2) rosrun baxter_traj_streamer traj_interpolator_as
+3) rosrun cartesian_moves cart_traj_as 
+4) rosrun cartesian_moves cart_traj_ac
+ respond to prompts for target locations
+
+seems to be working; needs rigorous testing;
+note: return to arm pose w/ cartesian move is unreliable--e.g., hits self
+  and ends up with unpredictable elbow orbit
+
+---added fnc: Baxter_IK_solver::ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns)
+
+  computes IK solns satisfying wrist point coords--w/ orientation don't-care;
+  can use this in non-grasp (e.g. retraction) motions
+
+want a server that can (in different modes)
+
+*plan an approach to specified A_des;
+ return good/bad and 
+ return approach q_approach;
+
+*plan a Cartesian-wrist move from q_start to q_mantis;
+
+...make a motion-planner library?
+
+w/ plans in jspace, can stuff traj's and use jnt_space interpolator;
+
+
+*perform a three-part move to approach:
+  -plan backwards from grasp pose to approach pose (0.2m above goal);
+   defines q coords of pre-approach;
+  --from start jspace pose, plan move Cartesian wrist mode to pre-approach jspace pose;
+
+  -use above planning: 
+    *aborts if approach-to-grasp is not reachable
+    else:
+    	*moves to position 0.2m above goal, ending w/ gripper pointed down;
+    	*does Cartesian move 0.2m straight down, preserving gripper orientation;
+
+*perform a depart move:
+  -if undoable, abort, else:
+  -from current pose, move 0.2m up, preserving gripper orientation
+
+*perform an approach move:
+  -if undoable, abort, else:
+  -from current pose, move 0.2m down, preserving gripper orientation
+
+*retract wrist along Cartesian path towards mantis pose (safe pre-pose, defined in jnt space)
+
+
+
+
+  
