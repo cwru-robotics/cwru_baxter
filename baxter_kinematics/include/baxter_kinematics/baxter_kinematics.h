@@ -208,11 +208,14 @@ public:
     
     // this version takes arm of desired hand pose w/rt torso frame
     int ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns);
+    int ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns); 
+    
     int ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<std::vector<Eigen::VectorXd> > &path_options);
     int ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_wrt_torso(Vectorq7x1 q_start, std::vector<std::vector<Eigen::VectorXd> > &path_options);  
     // in this version, soln ONLY for specified q_s0;  specify q_s0 and desired hand pose, w/rt torso
     // expect from 0 to 4 solutions at given q_s0    
     int ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns);
+    int ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns_123); // given desired hand pose, find all viable IK solns
     
     //function to find precise values of joint angles q1, q2, q3 to match desired wrist position, implied by desired_hand_pose
     //provide q123_approx; this function will take q_s0 and q_forearm as specified, and q_s1, q_humerus and q_elbow as approximated,

@@ -514,6 +514,13 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_h
     ik_solve_approx(desired_hand_pose_wrt_arm_mount,q_solns);
 }
 
+int Baxter_IK_solver::ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns) {
+    //convert desired_hand_pose into equiv w/rt right-arm mount frame:
+    //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
+    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso;
+    ik_wrist_solve_approx(desired_hand_pose_wrt_arm_mount,q_solns); // given desired hand pose, find all viable IK solns for wrist point only
+}
+
 // in this version, soln ONLY for specified q_s0;  specify q_s0 and desired hand pose, w/rt torso
 // expect from 0 to 4 solutions at given q_s0
 int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns) {
@@ -545,6 +552,78 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const&
     }          
     //cout<<"there are "<<q_solns.size()<<" solutions with wrist options"<<endl;
     return q_solns.size(); // return number of solutions found            
+}
+
+
+// assumes desired_hand_pose is w/rt D-H frame 0;
+//major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
+// for WRIST ONLY; ignores last 3DOF's
+// for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
+int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns_123) // given desired hand pose, find all viable IK solns for wrist pt
+{ 
+  double q_s0_ctr = compute_qs0_ctr(desired_hand_pose);
+  //cout<<"ik_solve_approx: q_s0_ctr = "<<q_s0_ctr<<endl;
+  double dqs0 = DQS0; // search resolution on dq0
+  double  q_s0 = q_s0_ctr;
+  std::vector<Vectorq7x1> q_solns_of_qs0,q_solns;
+  Vectorq7x1 q_soln;
+  int nsolns=0;
+  q_solns.clear(); // fill in all valid solns in this list
+  q_solns_123.clear();  
+  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_hand_pose);
+  Eigen::Affine3d A_fwd_DH;  
+  Eigen::Matrix4d A_wrist;
+  Eigen::Matrix3d Rdes = desired_hand_pose.linear();
+  bool reachable = true;  
+  while (reachable) { 
+        //cout<<"try q_s0 = "<<q_s0<<endl;
+        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        
+        if (reachable ) {
+            //test these solns:
+            //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
+            //cout<<"num solns at q_s0 = "<<q_solns_of_qs0.size()<<endl;
+            for (int i=0;i<q_solns_of_qs0.size();i++) {
+                /*
+                A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
+                A_wrist = get_wrist_frame();
+                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                  */
+                q_solns.push_back(q_solns_of_qs0[i]);
+            }
+            q_s0+= dqs0;
+        }
+    }
+    //cout<<"found q_s0 max = "<<q_s0<<endl;
+    reachable = true;
+    //order these in reverse
+    for (int i=q_solns_123.size()-1; i>=0;i--)
+    {
+        q_solns_123.push_back(q_solns[i]); // push these on in reverse order, from q_s0_max towards q_s0_ctr
+    }
+    //cout<<"pushed "<<q_solns.size()<<" solns in fwd search qs0"<<endl;
+    // now search in neg rot of q_s0 from center:
+    q_s0 = q_s0_ctr - dqs0;
+    //q_solns_123.clear();
+    while (reachable) { 
+        //cout<<"try q_s0 = "<<q_s0<<endl;
+        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        if (reachable ) {
+            //test these solns:
+            //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
+            for (int i=0;i<q_solns_of_qs0.size();i++) {
+                /*
+                A_fwd_DH = fwd_kin_solve(q_solns_of_qs0[i]);
+                A_wrist = get_wrist_frame();
+                std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
+                 * */
+                q_solns_123.push_back(q_solns_of_qs0[i]);
+            }
+            q_s0-= dqs0;
+        }
+    }
+    //cout<<"found q_s0 min = "<<q_s0<<endl;
+    return q_solns_123.size();
 }
 
 
