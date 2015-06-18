@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         else {
-            ROS_INFO("finished before timeou");
+            ROS_INFO("finished before timeout");
         }
         
         }

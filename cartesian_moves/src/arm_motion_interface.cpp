@@ -1,8 +1,9 @@
-// test_cart_path_planner_lib: 
+// arm_motion_interface: 
 // wsn, June, 2015
 // start of higher-level node to accept commands and perform planning and motion requests
 // requires trajActionServer is running (rosrun baxter_traj_streamer traj_interpolator_as)
 // at present, talk to this node via service: cartMoveSvc
+// likely, later change to an action server
 
 // uses library of arm-motion planning functions
 #include <cartesian_moves/cart_path_planner_lib.h>
@@ -12,11 +13,15 @@
 #include <actionlib/client/terminal_state.h>
 #include <baxter_traj_streamer/baxter_traj_streamer.h>
 #include<baxter_traj_streamer/trajAction.h>
-#include<std_msgs::float32>
+#include<std_msgs/Float32.h>
+#include<geometry_msgs/PoseStamped.h>
+#include<std_msgs/Bool.h>
 
+#include <cartesian_moves/arm_motion_interface_defs.h>
 //if these continue to be used, put them in a header file
 // COMMAND MODES:
-const int UNDEFINED_MODE=0;
+/*
+const int TEST_MODE =0;
 const int GO_TO_PREDFINED_PRE_POSE=1;
 const int DESCEND_20CM=2;
 const int DEPART_20CM=3;
@@ -33,80 +38,113 @@ const int RECEIVED_AND_INITIATED_RQST=1;
 const int REQUEST_REJECTED_ALREADY_BUSY=2;
 const int SERVER_NOT_BUSY=3;
 const int SERVER_IS_BUSY=4;
- 
-// create a class to use:
-class armMotionInterface {
+ */
+
+// define a class to use:
+class ArmMotionInterface {
 private:
-
-    //ros::NodeHandle nh_; // if need a node handle, get one upon instantiation
+    ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
+    // some objects to support subscriber, service, and publisher
+    //ros::Subscriber minimal_subscriber_; //these will be set up within the class constructor, hiding these ugly details
+    ros::ServiceServer arm_motion_interface_service_;
+    //ros::Publisher  minimal_publisher_;
     
-
-    Eigen::Vector3d n_des_, t_des_, b_des_;
-    
-    Eigen::Affine3d a_tool_start_,a_tool_end_;
-    Eigen::Matrix3d R_gripper_down_;
-    std::vector<Eigen::VectorXd> optimal_path_;
-    
-    Baxter_IK_solver baxter_IK_solver_; // instantiate an IK solver
-    Baxter_fwd_solver baxter_fwd_solver_; //instantiate a forward-kinematics solver   
-    
-    // use this classes baxter fk solver to compute and return tool-flange pose w/rt torso, given right-arm joint angles  
-    Eigen::Affine3d get_fk_Affine_from_qvec(Vectorq7x1 q_vec);
-
-public:
-    CartTrajPlanner(); //define the body of the constructor outside of class definition
-
-    ~CartTrajPlanner(void) {
-    }
-    //specify start and end poses w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
-    bool cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
-    // alt version: specify start as a q_vec, and goal as a Cartesian pose (w/rt torso)    
-    bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
-    bool cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
-   
-    Eigen::Matrix3d get_R_gripper_down(void) { return R_gripper_down_;}
-    
-
-};
-
-
 //globals for main/callback sync:
-bool g_received_new_request=false;
-bool g_busy_working_on_a_request=false;
+    bool g_received_new_request=false;
+    bool g_busy_working_on_a_request=false;
 
-//globals for CB to populate:
-geometry_msgs::PoseStamped g_poseStamped_start_rqst;
-geometry_msgs::PoseStamped g_poseStamped_goal_rqst;
+    //globals for CB to populate:
+    geometry_msgs::PoseStamped g_poseStamped_start_rqst;
+    geometry_msgs::PoseStamped g_poseStamped_goal_rqst;
 
-int g_command_mode=UNDEFINED_MODE;
-int g_plan_id_rqst = 0;
-int g_plan_id_resp = 0;
-bool g_bool_resp = false;
-int  g_rtn_code = 0;
-std_msgs::float32 g_q_vec_start_msg[],g_q_vec_end_msg[];
+    int g_command_mode=TEST_MODE;
+    int g_plan_id_rqst = 0;
+    int g_plan_id_resp = 0;
+    bool g_bool_resp = false;
+    int  g_rtn_code = 0;
+    
+    cwru_srv::arm_nav_service_messageRequest  g_request;
+    
+    std_msgs::Float32 g_q_vec_start_msg[],g_q_vec_end_msg[];
 
 
 
-Eigen::VectorXd g_q_vec_start_rqst;
-Eigen::VectorXd g_q_vec_end_rqst;
-Eigen::VectorXd g_q_vec_start_resp;
-Eigen::VectorXd g_q_vec_end_resp;
+    Eigen::VectorXd g_q_vec_start_rqst;
+    Eigen::VectorXd g_q_vec_end_rqst;
+    Eigen::VectorXd g_q_vec_start_resp;
+    Eigen::VectorXd g_q_vec_end_resp;
 //Eigen::Affine3d A_start;
 //Eigen::Affine3d A_end;
-Eigen::Affine3d g_a_tool_start,g_a_tool_end;  
+    Eigen::Affine3d g_a_tool_start,g_a_tool_end;  
 
-Vectorq7x1 g_q_vec_right_arm; //use this for current joint-space pose of robot
-
+    Vectorq7x1 g_q_vec_right_arm; //use this for current joint-space pose of robot
+    Eigen::VectorXd g_q_in_vecxd;
 // these can morph into member data
 
-std::vector<Eigen::VectorXd> g_optimal_path;
-trajectory_msgs::JointTrajectory g_des_trajectory; // an empty trajectory
+    std::vector<Eigen::VectorXd> g_optimal_path;
+    trajectory_msgs::JointTrajectory g_des_trajectory; // an empty trajectory
         
-//some handy constants...
-Eigen::Matrix3d g_R_gripper_down;
-Vectorq7x1 g_q_pre_pose;
+    //some handy constants...
+    Eigen::Matrix3d g_R_gripper_down;
+    Vectorq7x1 g_q_pre_pose;    
     
-bool cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_message_service_messageResponse& response) {
+    //Baxter_IK_solver baxter_IK_solver_; // instantiate an IK solver
+    Baxter_fwd_solver baxter_fwd_solver_; //instantiate a forward-kinematics solver 
+    CartTrajPlanner cartTrajPlanner_; // from cartesian trajectory planner library
+    
+    // member methods as well:
+    //void initializeSubscribers(); // we will define some helper methods to encapsulate the gory details of initializing subscribers, publishers and services
+    //void initializePublishers();
+    void initializeServices();
+    
+    //void subscriberCallback(const std_msgs::Float32& message_holder); //prototype for callback of example subscriber
+    //prototype for callback for service
+    bool cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_messageResponse& response);
+
+public:
+    ArmMotionInterface(ros::NodeHandle* nodehandle); //define the body of the constructor outside of class definition
+    ~ArmMotionInterface(void) {
+    }
+    void go_to_predefined_pre_pose(void);
+    bool isBusy(void) { return g_busy_working_on_a_request; }
+    bool newRqst(void) { return g_received_new_request; }
+    void setNewRqst(bool rcvd_new_rqst) {  g_received_new_request=rcvd_new_rqst;}  // 
+    void setIsBusy(bool isBusy) {g_busy_working_on_a_request= isBusy; } // 
+    int get_cmd_mode(void) { return g_command_mode; }
+    Eigen::VectorXd  get_start_qvec(void) { return g_q_vec_start_rqst; }
+    bool unpack_qstart(void);
+};
+
+//CONSTRUCTOR: pass in a node handle;
+ArmMotionInterface::ArmMotionInterface(ros::NodeHandle* nodehandle):nh_(*nodehandle)
+{ // constructor
+    ROS_INFO("in class constructor of ArmMotionInterface");
+    //initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
+    //initializePublishers();
+    initializeServices();
+    
+    //initialize variables here, as needed
+    g_q_pre_pose<< -0.907528, -0.111813,   2.06622,    1.8737,    -1.295,   2.00164,  -2.87179; 
+    g_q_vec_start_rqst<< 0,0,0,0,0,0,0; // make this a 7-d vector
+    g_q_vec_end_rqst<< 0,0,0,0,0,0,0;
+    g_q_vec_start_resp<< 0,0,0,0,0,0,0;
+    g_q_vec_end_resp<< 0,0,0,0,0,0,0;
+    g_R_gripper_down = cartTrajPlanner_.get_R_gripper_down();
+    
+    // can also do tests/waits to make sure all required services, topics, etc are alive
+}
+
+
+void ArmMotionInterface::initializeServices()
+{
+    ROS_INFO("Initializing cartMoveSvc");
+    arm_motion_interface_service_ = nh_.advertiseService("cartMoveSvc",
+                                                   &ArmMotionInterface::cartMoveSvcCB,
+                                                   this);  
+    // add more services here, as needed
+}
+    
+bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_messageResponse& response) {
     //if busy, refuse new requests;
     if(g_busy_working_on_a_request||g_received_new_request) {
         response.bool_resp = false; // dummy; //working_on_trajectory; // return status of "working on trajectory"
@@ -116,7 +154,7 @@ bool cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::
     
     // for a simple status query, handle it now;
     if (request.cmd_mode == IS_SERVER_BUSY_QUERY) {
-        if ((g_busy_working_on_a_request) {
+        if (g_busy_working_on_a_request) {
             response.rtn_code = SERVER_IS_BUSY;
         }
         else {
@@ -126,47 +164,62 @@ bool cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::
     }
     
     //if here, ready to accept a new command
+    g_request = request;
+    
+
     g_command_mode = request.cmd_mode;
     g_received_new_request=true; // alert "main" that a new request came in
  
     // copy the message data to globals:
+    /*
     g_poseStamped_start_rqst =    request.poseStamped_start;
     g_poseStamped_goal_rqst = request.poseStamped_goal;
     g_q_vec_start_msg = request.q_vec_start;
     g_q_vec_end_msg= request.q_vec_end;   
     g_plan_id_rqst = request.plan_id;
-
+    */
     response.bool_resp = true; // dummy; //working_on_trajectory; // return status of "working on trajectory"
-    response.rtn_code = RECEIVED_RQST;
+    response.rtn_code = RECEIVED_AND_INITIATED_RQST;
     return true;
 }
 
-void go_to_predefined_pre_pose(void) {
+void ArmMotionInterface::go_to_predefined_pre_pose(void) {
     //start from current jspace pose:
-    g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
-    
-    
+    cout<<"called go_to_predefined_pre_pose"<<endl;
+    //g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
+     
 }
+
+//convert float32[] to Eigen type for joint-space start vector;
+bool ArmMotionInterface::unpack_qstart(void) {
+    //Eigen::VectorXd g_q_vec_start_rqst;
+    //g_request
+    int njoints = g_request.q_vec_start.size();
+    cout<<"size of request q_start: "<< njoints<<endl;
+    if (njoints != 7) {
+        return false;
+    }
+    for (int i=0;i<7;i++) {
+        g_q_vec_start_rqst[i] = g_request.q_vec_start[i];
+    }
+    return true;
+}
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "test_cart_path_planner_lib");
-    ros::NodeHandle nh; //standard ros node handle    
-    Eigen::VectorXd q_in_vecxd;
- 
-    g_q_pre_pose<< -0.907528, -0.111813,   2.06622,    1.8737,    -1.295,   2.00164,  -2.87179; 
-        
-    ROS_INFO("instantiating a cartesian planner object: ");   
-    CartTrajPlanner cartTrajPlanner;
-    g_R_gripper_down = cartTrajPlanner.get_R_gripper_down();
+    ros::NodeHandle nh; //standard ros node handle   
     
-    ROS_INFO("Initializing service: cartMoveSvc");
-    ros::ServiceServer cartMoveSvc = nh.advertiseService("cartMoveSvc",cartMoveSvcCB); 
-    
+    ROS_INFO("instantiating an ArmMotionInterface: ");
+    ArmMotionInterface armMotionInterface(&nh);
+      
     
     //can do this, if needed: A = cartTrajPlanner.get_fk_Affine_from_qvec(Vectorq7x1 q_vec)    
     
+    /*
     cout<<"instantiating a traj streamer"<<endl; // enter 1:";
         //cin>>ans;
+    // let the streamer be owned by "main"
     Baxter_traj_streamer baxter_traj_streamer(&nh); //instantiate a Baxter_traj_streamer object and pass in pointer to nodehandle for constructor to use  
     // warm up the joint-state callbacks;
     cout<<"warming up callbacks..."<<endl;
@@ -181,7 +234,9 @@ int main(int argc, char** argv) {
      g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm();       
     }
     cout<<"r_arm state:"<<g_q_vec_right_arm.transpose()<<endl; 
-    
+    */
+    //let's leave this in main:
+    /*
     ROS_INFO("instantiating an action client of trajActionServer");
     actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> action_client("trajActionServer", true);
         
@@ -194,7 +249,7 @@ int main(int argc, char** argv) {
             ros::Duration(0.5).sleep();
             ROS_INFO("retrying...");
         }
-            
+      
         // something odd in above: does not seem to wait for 5 seconds, but returns rapidly if server not running
        // if (!server_exists) {
        //     ROS_WARN("could not connect to server; will wait forever");
@@ -203,34 +258,47 @@ int main(int argc, char** argv) {
         //server_exists = action_client.waitForServer(); //wait forever 
                
         ROS_INFO("connected to action server");  // if here, then we connected to the server;    
-        
+      */
+    
+    bool unpackok;
         // start servicing requests:
         while (ros::ok())  {
-            if (g_received_new_request&&!g_busy_working_on_a_request) {
-                g_received_new_request=false; // reset trigger to receive a new request
-                g_busy_working_on_a_request= true; // begin processing new request
+            //decide if should start processing a new request:
+            if (armMotionInterface.newRqst()&&!armMotionInterface.isBusy()) {
+                armMotionInterface.setNewRqst(false); //g_received_new_request=false; // reset trigger to receive a new request
+                armMotionInterface.setIsBusy(true); //g_busy_working_on_a_request= true; // begin processing new request
             }
-            if (g_busy_working_on_a_request) {
-                switch (g_command_mode) {
-
+            if (armMotionInterface.isBusy()) {
+                switch (armMotionInterface.get_cmd_mode()) {
+                    case TEST_MODE: 
+                        cout<<"testing request data: "<<endl;
+                        unpackok=false;
+                        //unpackok = armMotionInterface.unpack_qstart();
+                        if (unpackok) {
+                            cout<<"start qvec: "<<armMotionInterface.get_start_qvec().transpose()<<endl;
+                        }
+                        armMotionInterface.setIsBusy(false);
+                        break;
+                        
                     case GO_TO_PREDFINED_PRE_POSE : 
-                        go_to_predefined_pre_pose();
-                        g_busy_working_on_a_request=false;
+                        armMotionInterface.go_to_predefined_pre_pose();
+                        armMotionInterface.setIsBusy(false);
                         break;
                     //case DESCEND_20CM:
                     //case DEPART_20CM:
                     //case PLAN_PATH_QSTART_TO_ADES:
                     //case PLAN_PATH_QSTART_TO_QGOAL:
                     //case PLAN_PATH_ASTART_TO_QGOAL:
-                    case UNDEFINED_MODE: 
+
                     default : 
-                        ROS_WARN("this command mode is not defined: %d",g_command_mode);
+                        ROS_WARN("this command mode is not defined: %d",armMotionInterface.get_cmd_mode());
                         //clean up/terminate:
-                        g_busy_working_on_a_request=false;
+                         armMotionInterface.setIsBusy(false);
                 }
             }
             ros::spinOnce();
-            ros::Duration(0.1).sleep(); //don't consume much cpu time if not actively working on a command
+            cout<<"main loop..."<<endl;
+            ros::Duration(0.5).sleep(); //don't consume much cpu time if not actively working on a command
         }
     
 

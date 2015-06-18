@@ -70,6 +70,94 @@ w/ plans in jspace, can stuff traj's and use jnt_space interpolator;
 
 *retract wrist along Cartesian path towards mantis pose (safe pre-pose, defined in jnt space)
 
+----design:
+  test_cart_path_planner looks OK...but make this an action server? library good enough?
+  justify based on higher-level skills (e.g., testing moves, invoking moves; multi-step moves;
+   skills)
+
+  what skills do we want? (by-pass cartesian-move action server? but emulate the design?)
+
+  want a single action server with multiple skills; would need corresponding flexibility of action msg
+   (OK if some fields are left empty??)
+
+  also use for queries?  
+   e.g.--is a Cartesian path to A_des reachable (and without IK jumps?)
+         rqst execution of previously-computed path (ugly--rqrs keeping track of history)
+            --maybe send a path ID?  and request execution via path ID? 
+                 handle errors if path ID not valid?
+
+  how to connect w/ point-cloud processing:
+  e.g., PCL processor does:
+   receive pub; place marker at location (sphere or full frame)
+   also, respond w/ this (most recent, illustrated) frame via service request; (need svc message for a frame, plus routines
+    for msg_to_A and A_to_msg)...use PoseStamped.msg?  includes header (ref frame) and quaternion
+    (for surface normal)
+
+higher-level pgm: HLP
+   user pt selection is independent node;
+
+   from user button, HLP requests coords of displayed frame (from PCL node)
+   from user button, request path plan; (different mode options...e.g. grasp from above)
+    display approach pose?
+    evaluate response (preview?  good/bad?)
+   from user button, request execution of the plan;
+    (user button for gripper open/closed?)
+   user button for gripper open/close
+
+better: "grab can from above" skill
+   if there are lots of skills, where do they go?  
+   how to set context for PC processing?
+
+NASA relevance: models known in advance;
+  list skills required;
+
+...back to can-grabbing skill:
+  operator does:
+   (interact w/ PCL service)
+    *find surface (need to set mode; current GUI possible)
+    *select pts on can
+    *invoke model fitting of can; include placement of grasp frame;
+      (all of above in PCL node/service/as)
+    
+   (interact w/ path-planning/execution service)
+    *set context to grasp-can-from-above skill (provide grasp pose)
+    *invoke can grasping: (step-wise, or combined options)
+	*refer to provided coords of can top
+	*grasp planning-> trajectories;
+    	*evaluation of the plan
+	*open gripper
+	*do arm motion to approach pose
+	*do approach motion to grasp pose
+	*close the gripper
+
+    *invoke grasp depart:
+	*retract to approach pose, holding the can
+
+    *invoke can placement: (assumes can is grasped from above)
+	*refer to coords of pose on table (and compute necessary offsets)
+	*plan arm motion
+	*evaluate plan
+	*execute depart motion to safe height
+	*execute translation motion
+	*execute placement motion
+	*open gripper
+	*vertical depart
+
+
+PCL pgm does not interact directly with planner_service;
+
+planner service DOES interact with traj_interpolator node
+planner service interacts w/ rviz?  (shows markers)
+
+start simple: service codes for separate actions
+
+
+
+	
+
+
+
+
 
 
 

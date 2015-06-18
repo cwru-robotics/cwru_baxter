@@ -301,3 +301,9 @@ bool CartTrajPlanner::cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Aff
     return true;
 }
 
+// use this classes baxter fk solver to compute and return tool-flange pose w/rt torso, given right-arm joint angles
+Eigen::Affine3d CartTrajPlanner::get_fk_Affine_from_qvec(Vectorq7x1 q_vec) {
+    Eigen::Affine3d Affine_pose;
+    Affine_pose = baxter_fwd_solver_.fwd_kin_solve_wrt_torso(q_vec);
+    
+}

@@ -1,6 +1,8 @@
 // cart_path_planner_lib header
 // wsn, June, 2015
 // a library of arm-motion planning functions
+#ifndef CART_PATH_PLANNER_H_
+#define CART_PATH_PLANNER_H_
 
 #include<ros/ros.h>
 
@@ -36,7 +38,10 @@ private:
     std::vector<Eigen::VectorXd> optimal_path_;
     
     Baxter_IK_solver baxter_IK_solver_; // instantiate an IK solver
-    Baxter_fwd_solver baxter_fwd_solver_; //instantiate a forward-kinematics solver    
+    Baxter_fwd_solver baxter_fwd_solver_; //instantiate a forward-kinematics solver   
+    
+    // use this classes baxter fk solver to compute and return tool-flange pose w/rt torso, given right-arm joint angles  
+    Eigen::Affine3d get_fk_Affine_from_qvec(Vectorq7x1 q_vec);
 
 public:
     CartTrajPlanner(); //define the body of the constructor outside of class definition
@@ -54,3 +59,4 @@ public:
 
 };
 
+#endif	
