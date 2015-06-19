@@ -51,8 +51,75 @@ int main(int argc, char **argv) {
 
     // populate a service request message:
     arm_nav_srv_msg.request.cmd_mode = TEST_MODE;
+    //populate the service message with value for q_vec_start
+    arm_nav_srv_msg.request.q_vec_start.clear();
+    for (int i=0;i<7;i++) {
+        arm_nav_srv_msg.request.q_vec_start.push_back(q_in[i]);
+    }
     arm_nav_svc_client.call(arm_nav_srv_msg);
+    
+    
+    // request plan from current pose to pre-pose: this will set start and end j-space poses
+    arm_nav_srv_msg.request.cmd_mode = PLAN_PATH_CURRENT_TO_PRE_POSE;
+    cout<<"sending request PLAN_PATH_CURRENT_TO_PRE_POSE"<<endl;
+    arm_nav_svc_client.call(arm_nav_srv_msg);   
+    int status = SERVER_IS_BUSY;
+    cout<<"waiting for not busy..."<<endl;
+    while (status != SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+        arm_nav_svc_client.call(arm_nav_srv_msg); 
+        status = arm_nav_srv_msg.response.rtn_code;
+        cout<<"status code: "<<status<<endl;
+    }
+    
+    
+    //try a query: are internal values of q_start and q_end used by motion interface?
+    cout<<"sending q-data inquiry: "<<endl;
+    arm_nav_srv_msg.request.cmd_mode = GET_Q_DATA;
+    arm_nav_svc_client.call(arm_nav_srv_msg);
+    //interpret the response data:
     cout<<"response.rtn_code: "<<arm_nav_srv_msg.response.rtn_code<<endl;
+    int nsize; 
+    nsize = arm_nav_srv_msg.response.q_vec_start.size();
+    if (nsize>0) {
+           cout<<"response.q_start:";
+        for (int i=0;i<nsize;i++) cout<<" "<<arm_nav_srv_msg.response.q_vec_start[i]<<",";
+        cout<<endl;
+    }
+    nsize = arm_nav_srv_msg.response.q_vec_end.size();
+    if (nsize>0) {
+           cout<<"response.q_end:";
+        for (int i=0;i<nsize;i++) cout<<" "<<arm_nav_srv_msg.response.q_vec_start[i]<<",";
+        cout<<endl;   
+    }
+    
+        // populate a service request message: plan a relative cartesian move
+    arm_nav_srv_msg.request.cmd_mode = DESCEND_20CM;
+    //populate the service message with value for q_vec_start
+    arm_nav_srv_msg.request.q_vec_start.clear();
+    arm_nav_svc_client.call(arm_nav_srv_msg);
+    
+    // when ready, tell the interface to execute the path:
+     arm_nav_srv_msg.request.cmd_mode = DESCEND_20CM;
+
+   status = SERVER_IS_BUSY;
+    cout<<"waiting for not busy..."<<endl;
+    while (status != SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+        arm_nav_svc_client.call(arm_nav_srv_msg); 
+        status = arm_nav_srv_msg.response.rtn_code;
+        cout<<"status code: "<<status<<endl;
+    }     
+    arm_nav_srv_msg.request.cmd_mode = EXECUTE_PLANNED_PATH;
+    arm_nav_svc_client.call(arm_nav_srv_msg);
+   status = SERVER_IS_BUSY;
+    cout<<"waiting for not busy..."<<endl;
+    while (status != SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+        arm_nav_svc_client.call(arm_nav_srv_msg); 
+        status = arm_nav_srv_msg.response.rtn_code;
+        cout<<"status code: "<<status<<endl;
+    }     
     
 
     return 0;

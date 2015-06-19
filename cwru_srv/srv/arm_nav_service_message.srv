@@ -14,6 +14,9 @@ geometry_msgs/PoseStamped poseStamped_goal
 #subsequently, the client can request that a named (plan_id) plan be executed
 int32 plan_id
 
+#this vector can be useful for specifying desired cartesian displacements
+float32[] delta_p 
+
 ---
 #some responses require only true/false (e.g., good path/ no good path)
 bool bool_resp
@@ -26,5 +29,5 @@ int32 rtn_code
 int32 plan_id
 
 #optionally, return joint-space arm pose(s) for start and/or finish, per plan
-#float32 q_vec_start[]
-#float32 q_vec_end[]
+float32[] q_vec_start
+float32[] q_vec_end

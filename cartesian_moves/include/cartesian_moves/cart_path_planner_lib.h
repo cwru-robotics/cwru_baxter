@@ -48,12 +48,18 @@ public:
 
     ~CartTrajPlanner(void) {
     }
-    //specify start and end poses w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
+    ///specify start and end poses w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
     bool cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
-    // alt version: specify start as a q_vec, and goal as a Cartesian pose (w/rt torso)    
+    /// alt version: specify start as a q_vec, and goal as a Cartesian pose (w/rt torso)    
     bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
+    /// alt version--only plan wrist-point motion; don't worry about wrist orientation
     bool cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
-   
+    
+    /// alt version: specify start as a q_vec, and desired z motion (+ is up) while holding x,y and R fixed
+    //bool cartesian_path_planner_zmotion(Vectorq7x1 q_start,double z_dist, std::vector<Eigen::VectorXd> &optimal_path);
+    ///alt version: compute path from current pose with cartesian move of delta_p with R fixed
+    /// return "true" if successful
+    bool cartesian_path_planner_delta_p(Vectorq7x1 q_start, Eigen::Vector3d delta_p, std::vector<Eigen::VectorXd> &optimal_path);
     Eigen::Matrix3d get_R_gripper_down(void) { return R_gripper_down_;}
     
 

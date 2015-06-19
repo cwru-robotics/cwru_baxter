@@ -9,12 +9,18 @@ const int IS_SERVER_BUSY_QUERY = 1;
 const int PLAN_PATH_QSTART_TO_ADES = 4;
 const int PLAN_PATH_QSTART_TO_QGOAL = 5;
 const int PLAN_PATH_ASTART_TO_QGOAL = 6;
+const int PLAN_PATH_CURRENT_TO_PRE_POSE=7;
 
+const int GET_Q_DATA = 8;
+
+const int EXECUTE_PLANNED_PATH = 9;
 
 
 //responses...
+const int STATUS_UNDEFINED=0;
 const int RECEIVED_AND_INITIATED_RQST=1;
 const int REQUEST_REJECTED_ALREADY_BUSY=2;
 const int SERVER_NOT_BUSY=3;
 const int SERVER_IS_BUSY=4;
+const int RECEIVED_AND_COMPLETED_RQST=5;
 #endif

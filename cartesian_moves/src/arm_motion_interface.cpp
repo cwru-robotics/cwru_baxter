@@ -18,8 +18,8 @@
 #include<std_msgs/Bool.h>
 
 #include <cartesian_moves/arm_motion_interface_defs.h>
-//if these continue to be used, put them in a header file
-// COMMAND MODES:
+
+// COMMAND MODES: check the above header file for latest
 /*
 const int TEST_MODE =0;
 const int GO_TO_PREDFINED_PRE_POSE=1;
@@ -31,14 +31,20 @@ const int PLAN_PATH_QSTART_TO_ADES = 4;
 const int PLAN_PATH_QSTART_TO_QGOAL = 5;
 const int PLAN_PATH_ASTART_TO_QGOAL = 6;
 
-
-
 //responses...
 const int RECEIVED_AND_INITIATED_RQST=1;
 const int REQUEST_REJECTED_ALREADY_BUSY=2;
 const int SERVER_NOT_BUSY=3;
 const int SERVER_IS_BUSY=4;
  */
+    
+//global vec for current joint angles of right arm
+Vectorq7x1 g_q_vec_right_arm; //use this for current joint-space pose of robot    
+    
+//global vec to contain optimal path from planners
+//treating this vector as global, so can be accessed by "main"
+std::vector<Eigen::VectorXd> g_optimal_path;
+trajectory_msgs::JointTrajectory g_des_trajectory; // global trajectory object
 
 // define a class to use:
 class ArmMotionInterface {
@@ -66,7 +72,8 @@ private:
     cwru_srv::arm_nav_service_messageRequest  g_request;
     
     std_msgs::Float32 g_q_vec_start_msg[],g_q_vec_end_msg[];
-
+    //these may be specified in request, if desire offset cartesian move
+    Eigen::Vector3d delta_p_;
 
 
     Eigen::VectorXd g_q_vec_start_rqst;
@@ -77,12 +84,14 @@ private:
 //Eigen::Affine3d A_end;
     Eigen::Affine3d g_a_tool_start,g_a_tool_end;  
 
-    Vectorq7x1 g_q_vec_right_arm; //use this for current joint-space pose of robot
     Eigen::VectorXd g_q_in_vecxd;
-// these can morph into member data
 
-    std::vector<Eigen::VectorXd> g_optimal_path;
-    trajectory_msgs::JointTrajectory g_des_trajectory; // an empty trajectory
+    bool path_is_valid_;
+    int path_id_;
+
+    //treating this vector as global, so can be accessed by "main"
+    //std::vector<Eigen::VectorXd> g_optimal_path;
+    //trajectory_msgs::JointTrajectory g_des_trajectory; // an empty trajectory
         
     //some handy constants...
     Eigen::Matrix3d g_R_gripper_down;
@@ -100,19 +109,32 @@ private:
     //void subscriberCallback(const std_msgs::Float32& message_holder); //prototype for callback of example subscriber
     //prototype for callback for service
     bool cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_messageResponse& response);
-
+    void pack_qstart(cwru_srv::arm_nav_service_messageResponse& response);
+    void pack_qend(cwru_srv::arm_nav_service_messageResponse& response);
 public:
     ArmMotionInterface(ros::NodeHandle* nodehandle); //define the body of the constructor outside of class definition
     ~ArmMotionInterface(void) {
     }
     void go_to_predefined_pre_pose(void);
+    void plan_path_to_predefined_pre_pose(void);
+    
+    bool plan_cartesian_delta_p(Vectorq7x1 q_start,Eigen::Vector3d delta_p);
+
+    
     bool isBusy(void) { return g_busy_working_on_a_request; }
     bool newRqst(void) { return g_received_new_request; }
     void setNewRqst(bool rcvd_new_rqst) {  g_received_new_request=rcvd_new_rqst;}  // 
     void setIsBusy(bool isBusy) {g_busy_working_on_a_request= isBusy; } // 
     int get_cmd_mode(void) { return g_command_mode; }
     Eigen::VectorXd  get_start_qvec(void) { return g_q_vec_start_rqst; }
+    Eigen::VectorXd  get_end_qvec(void) { return g_q_vec_end_rqst; }    
+    void setPathValid(bool is_valid) { path_is_valid_ = is_valid; }
+    void incrementPathID(void) { path_id_++; }
+    
     bool unpack_qstart(void);
+    bool unpack_qend(void);
+    bool unpack_delta_p(void);
+
 };
 
 //CONSTRUCTOR: pass in a node handle;
@@ -122,15 +144,18 @@ ArmMotionInterface::ArmMotionInterface(ros::NodeHandle* nodehandle):nh_(*nodehan
     //initializeSubscribers(); // package up the messy work of creating subscribers; do this overhead in constructor
     //initializePublishers();
     initializeServices();
-    
+    //cout<<"done initializing service; initializing member vars: ";
+
     //initialize variables here, as needed
     g_q_pre_pose<< -0.907528, -0.111813,   2.06622,    1.8737,    -1.295,   2.00164,  -2.87179; 
-    g_q_vec_start_rqst<< 0,0,0,0,0,0,0; // make this a 7-d vector
-    g_q_vec_end_rqst<< 0,0,0,0,0,0,0;
-    g_q_vec_start_resp<< 0,0,0,0,0,0,0;
-    g_q_vec_end_resp<< 0,0,0,0,0,0,0;
+    g_q_vec_start_rqst=g_q_pre_pose;// 0,0,0,0,0,0,0; // make this a 7-d vector
+    g_q_vec_end_rqst=g_q_pre_pose;//<< 0,0,0,0,0,0,0;
+    g_q_vec_start_resp=g_q_pre_pose;//<< 0,0,0,0,0,0,0;
+    g_q_vec_end_resp=g_q_pre_pose;//<< 0,0,0,0,0,0,0;
     g_R_gripper_down = cartTrajPlanner_.get_R_gripper_down();
     
+    path_is_valid_=false;
+    path_id_=0;
     // can also do tests/waits to make sure all required services, topics, etc are alive
 }
 
@@ -154,6 +179,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     
     // for a simple status query, handle it now;
     if (request.cmd_mode == IS_SERVER_BUSY_QUERY) {
+        ROS_INFO("rcvd request for query--IS_SERVER_BUSY_QUERY"); 
         if (g_busy_working_on_a_request) {
             response.rtn_code = SERVER_IS_BUSY;
         }
@@ -162,6 +188,15 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
         }
         return true;  
     }
+    
+    //quick command requesting the internal value of q_start:
+     if (request.cmd_mode == GET_Q_DATA) {
+         ROS_INFO("rcvd request for query--GET_Q_DATA"); 
+         pack_qstart(response);
+         pack_qend(response);
+         response.rtn_code = RECEIVED_AND_COMPLETED_RQST;
+        return true;  
+    }   
     
     //if here, ready to accept a new command
     g_request = request;
@@ -186,11 +221,48 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
 void ArmMotionInterface::go_to_predefined_pre_pose(void) {
     //start from current jspace pose:
     cout<<"called go_to_predefined_pre_pose"<<endl;
+    cout<<"setting q_start and q_end: "<<endl;
+    g_q_vec_end_resp=g_q_pre_pose;
+    g_q_vec_end_resp= g_q_vec_right_arm;
+    //compute a path here:
+    
     //g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
      
 }
 
-//convert float32[] to Eigen type for joint-space start vector;
+//given q_start, compute the tool-flange pose, and compute a path to move delta_p with R fixed
+// return the optimized joint-space path in optimal_path
+// this fnc can be used fairly generally--e.g., special cases such as 20cm descent from current arm pose 
+bool ArmMotionInterface::plan_cartesian_delta_p(Vectorq7x1 q_start,Eigen::Vector3d delta_p) {
+    //ROS_INFO("attempting Cartesian path plan for delta-p = %f, %f, %f",delta_p_(0),delta_p_(1),delta_p_(2));
+    cout<<delta_p.transpose()<<endl;
+    // this fnc will put the optimal_path result in a global vector, accessible by main
+    bool valid_path = cartTrajPlanner_.cartesian_path_planner_delta_p(q_start,delta_p, g_optimal_path);
+    if (valid_path) {
+        ROS_INFO("plan_cartesian_delta_p: computed valid delta-p path");
+        g_q_vec_start_resp =    g_optimal_path.front();
+        g_q_vec_end_resp =    g_optimal_path.back();  
+    }
+    else {
+        ROS_WARN("plan_cartesian_delta_p: path plan attempt not successful");
+    }
+
+    return valid_path;
+}
+
+
+void ArmMotionInterface::plan_path_to_predefined_pre_pose(void) {
+    cout<<"called plan_path_to_predefined_pre_pose"<<endl;
+    cout<<"setting q_start and q_end: "<<endl;
+    g_q_vec_end_resp=g_q_pre_pose;
+    cout<<"q pre-pose goal: "<<g_q_vec_end_resp.transpose()<<endl;
+    g_q_vec_start_resp= g_q_vec_right_arm;    
+    cout<<"q start = current arm state: "<<g_q_vec_start_resp.transpose()<<endl;
+    //plan a path: from q-start to q-goal...what to do with wrist??
+    
+}
+
+//convert float32[] from request into Eigen type for joint-space start vector;
 bool ArmMotionInterface::unpack_qstart(void) {
     //Eigen::VectorXd g_q_vec_start_rqst;
     //g_request
@@ -205,6 +277,55 @@ bool ArmMotionInterface::unpack_qstart(void) {
     return true;
 }
 
+//convert float32[] from request into Eigen type for joint-space end vector;
+bool ArmMotionInterface::unpack_qend(void) {
+    int njoints = g_request.q_vec_end.size();
+    //cout<<"size of request q_end: "<< njoints<<endl;
+    if (njoints != 7) {
+        return false;
+    }
+    for (int i=0;i<7;i++) {
+        g_q_vec_start_rqst[i] = g_request.q_vec_start[i];
+    }
+    return true;
+}
+
+// need this fnc if client requests a specific delta-p move
+bool ArmMotionInterface::unpack_delta_p(void) {    
+    int npts = g_request.delta_p.size();
+    if (npts!=3) {
+        ROS_WARN("plan_cartesian_delta_p: request delta_p is wrong size");
+        return false;
+    }
+    //copy message data to member var:
+    for (int i=0;i<3;i++) delta_p_(i) = g_request.delta_p[i];
+    cout<<"requested delta_p: "<<delta_p_.transpose()<<endl;        
+}
+
+// fill qstart in response message
+void ArmMotionInterface::pack_qstart(cwru_srv::arm_nav_service_messageResponse& response) {
+    response.q_vec_start.clear();
+    for (int i=0;i<7;i++) {
+        response.q_vec_start.push_back(g_q_vec_start_resp[i]);
+    }
+}
+
+
+// fill qend in response message
+void ArmMotionInterface::pack_qend(cwru_srv::arm_nav_service_messageResponse& response) {
+    response.q_vec_end.clear();
+    for (int i=0;i<7;i++) {
+        response.q_vec_end.push_back(g_q_vec_end_resp[i]);
+    }
+}
+
+// This function will be called once when the goal sent to the associated action server is complete
+// this is optional, but it is a convenient way to get access to the "result" message sent by the server
+void doneCb(const actionlib::SimpleClientGoalState& state,
+        const baxter_traj_streamer::trajResultConstPtr& result) {
+    ROS_INFO(" doneCb: server responded with state [%s]", state.toString().c_str());
+    ROS_INFO("got return val = %d; traj_id = %d",result->return_val,result->traj_id);
+}
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "test_cart_path_planner_lib");
@@ -216,7 +337,6 @@ int main(int argc, char** argv) {
     
     //can do this, if needed: A = cartTrajPlanner.get_fk_Affine_from_qvec(Vectorq7x1 q_vec)    
     
-    /*
     cout<<"instantiating a traj streamer"<<endl; // enter 1:";
         //cin>>ans;
     // let the streamer be owned by "main"
@@ -231,20 +351,22 @@ int main(int argc, char** argv) {
     cout<<"getting current right-arm pose:"<<endl;
     g_q_vec_right_arm[0] = 1000;
     while (fabs(g_q_vec_right_arm[0])>3) { // keep trying until see viable value populated by fnc
-     g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm();       
+     g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
+     ros::spinOnce();
+     ros::Duration(0.01).sleep();
     }
     cout<<"r_arm state:"<<g_q_vec_right_arm.transpose()<<endl; 
-    */
+    
     //let's leave this in main:
-    /*
+  
     ROS_INFO("instantiating an action client of trajActionServer");
-    actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> action_client("trajActionServer", true);
+    actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> traj_streamer_action_client("trajActionServer", true);
         
         // attempt to connect to the server:
         ROS_INFO("waiting for server trajActionServer: ");
         bool server_exists = false;
         while ((!server_exists)&&(ros::ok())) {
-            server_exists= action_client.waitForServer(ros::Duration(5.0)); // wait for up to 5 seconds
+            server_exists= traj_streamer_action_client.waitForServer(ros::Duration(5.0)); // wait for up to 5 seconds
             ros::spinOnce();
             ros::Duration(0.5).sleep();
             ROS_INFO("retrying...");
@@ -258,9 +380,13 @@ int main(int argc, char** argv) {
         //server_exists = action_client.waitForServer(); //wait forever 
                
         ROS_INFO("connected to action server");  // if here, then we connected to the server;    
-      */
+   
     
     bool unpackok;
+    Eigen::Vector3d delta_p;
+    bool is_valid;
+    bool finished_before_timeout;
+    baxter_traj_streamer::trajGoal goal;
         // start servicing requests:
         while (ros::ok())  {
             //decide if should start processing a new request:
@@ -271,25 +397,70 @@ int main(int argc, char** argv) {
             if (armMotionInterface.isBusy()) {
                 switch (armMotionInterface.get_cmd_mode()) {
                     case TEST_MODE: 
-                        cout<<"testing request data: "<<endl;
-                        unpackok=false;
-                        //unpackok = armMotionInterface.unpack_qstart();
+                        ROS_INFO("responding to request TEST_MODE: ");
+                        cout<<"unpacking q_vec_start from request message..."<<endl;
+                        unpackok = armMotionInterface.unpack_qstart();
                         if (unpackok) {
-                            cout<<"start qvec: "<<armMotionInterface.get_start_qvec().transpose()<<endl;
+                            cout<<"start qvec rqst: "<<armMotionInterface.get_start_qvec().transpose()<<endl;
                         }
-                        armMotionInterface.setIsBusy(false);
-                        break;
+                        unpackok = armMotionInterface.unpack_qend();
+                        if (unpackok) {
+                            cout<<"end qvec rqst: "<<armMotionInterface.get_end_qvec().transpose()<<endl;
+                        }
+                        //reply w/ populating q_vec_start in response:
                         
-                    case GO_TO_PREDFINED_PRE_POSE : 
-                        armMotionInterface.go_to_predefined_pre_pose();
                         armMotionInterface.setIsBusy(false);
                         break;
-                    //case DESCEND_20CM:
+                         
+                    case PLAN_PATH_CURRENT_TO_PRE_POSE : 
+                        ROS_INFO("responding to request PLAN_PATH_CURRENT_TO_PRE_POSE");
+                        armMotionInterface.plan_path_to_predefined_pre_pose();
+                        armMotionInterface.setIsBusy(false);
+                        break;
+                    case DESCEND_20CM:
+                        ROS_INFO("responding to request DESCEND_20CM");
+                        delta_p << 0,0,-0.2; //specify delta-p for a 20cm descent
+                        // find a joint-space path to do this, holding R fixed
+
+                        cout<<"getting current right-arm pose:"<<endl;
+                        g_q_vec_right_arm[0] = 1000;
+                        while (fabs(g_q_vec_right_arm[0])>3) { // keep trying until see viable value populated by fnc
+                            g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
+                            ros::spinOnce();
+                            ros::Duration(0.01).sleep();
+                        }
+                        
+                        is_valid = armMotionInterface.plan_cartesian_delta_p(g_q_vec_right_arm,delta_p);
+                        armMotionInterface.setPathValid(is_valid);
+                        armMotionInterface.incrementPathID();
+                        armMotionInterface.setIsBusy(false);
+                        break;
                     //case DEPART_20CM:
+                    //case CART_MOVE_DELTA_P: unpack_delta_p()...
                     //case PLAN_PATH_QSTART_TO_ADES:
                     //case PLAN_PATH_QSTART_TO_QGOAL:
                     //case PLAN_PATH_ASTART_TO_QGOAL:
 
+                    case EXECUTE_PLANNED_PATH: //assumes there is a valid planned path in g_optimal_path
+                        ROS_INFO("responding to request EXECUTE_PLANNED_PATH");
+                        // convert path to a trajectory:
+                        baxter_traj_streamer.stuff_trajectory(g_optimal_path, g_des_trajectory); //convert from vector of 7dof poses to trajectory message   
+                        goal.trajectory = g_des_trajectory;
+                        traj_streamer_action_client.sendGoal(goal,&doneCb); // we could also name additional callback functions here, if desired
+                         //    action_client.sendGoal(goal, &doneCb, &activeCb, &feedbackCb); //e.g., like this
+        
+                        finished_before_timeout = traj_streamer_action_client.waitForResult(ros::Duration(5.0));
+        
+                        if (!finished_before_timeout) {
+                            ROS_WARN("EXECUTE_PLANNED_PATH: giving up waiting on result");
+                            // should set status in service request here...
+                        }
+                        else {
+                            ROS_INFO("finished before timeout");
+                            // should set status in service request here...
+                        }          
+                        armMotionInterface.setIsBusy(false);
+                        break;
                     default : 
                         ROS_WARN("this command mode is not defined: %d",armMotionInterface.get_cmd_mode());
                         //clean up/terminate:
@@ -297,78 +468,9 @@ int main(int argc, char** argv) {
                 }
             }
             ros::spinOnce();
-            cout<<"main loop..."<<endl;
-            ros::Duration(0.5).sleep(); //don't consume much cpu time if not actively working on a command
+            //cout<<"main loop..."<<endl;
+            ros::Duration(0.1).sleep(); //don't consume much cpu time if not actively working on a command
         }
     
-
-    //a_tool_end.translation() = p_des;
-    //cout<<"p_des: "<<p_des.transpose()<<endl;
-    //cout<<"R_des: "<<endl;
-    //cout<<R_gripper_down<<endl;
-    
-/*
-
-    bool valid_path;
-    
-    valid_path = cartTrajPlanner.cartesian_path_planner_wrist(g_q_pre_pose,g_a_tool_end,g_optimal_path);
-    int npts = g_optimal_path.size();
-    cout<<"path npts = "<<npts<<endl;
-    for (int i=0;i<npts;i++) {
-        cout<<g_optimal_path[i].transpose()<<endl;
-    }
-    xxx
-
-    q_in_vecxd = q_vec_right_arm; // start from here;
-    des_path.push_back(q_in_vecxd); //put all zeros here
-    q_in_vecxd = q_pre_pose; // conversion; not sure why I needed to do this...but des_path.push_back(q_in_vecxd) likes it
-    des_path.push_back(q_in_vecxd); //twice, to define a trajectory  
-    
-
-    cout << "stuffing traj: " << endl;
-    baxter_traj_streamer.stuff_trajectory(des_path, des_trajectory); //convert from vector of 7dof poses to trajectory message        
-        // here is a "goal" object compatible with the server, as defined in example_action_server/action
-        baxter_traj_streamer::trajGoal goal; 
-        // does this work?  copy traj to goal:
-        goal.trajectory = des_trajectory;
-        //cout<<"ready to connect to action server; enter 1: ";
-        //cin>>ans;
-        // use the name of our server, which is: trajActionServer (named in traj_interpolator_as.cpp)
-        actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> action_client("trajActionServer", true);
-        
-        // attempt to connect to the server:
-        ROS_INFO("waiting for server: ");
-        bool server_exists = action_client.waitForServer(ros::Duration(5.0)); // wait for up to 5 seconds
-        // something odd in above: does not seem to wait for 5 seconds, but returns rapidly if server not running
-
-
-        if (!server_exists) {
-            ROS_WARN("could not connect to server; will wait forever");
-            return 0; // bail out; optionally, could print a warning message and retry
-        }
-        server_exists = action_client.waitForServer(); //wait forever 
-        
-       
-        ROS_INFO("connected to action server");  // if here, then we connected to the server;
-
-        //while(true) {
-        // stuff a goal message:
-        g_count++;
-        goal.traj_id = g_count; // this merely sequentially numbers the goals sent
-        ROS_INFO("sending traj_id %d",g_count);
-        //action_client.sendGoal(goal); // simple example--send goal, but do not specify callbacks
-        action_client.sendGoal(goal,&doneCb); // we could also name additional callback functions here, if desired
-        //    action_client.sendGoal(goal, &doneCb, &activeCb, &feedbackCb); //e.g., like this
-        
-        bool finished_before_timeout = action_client.waitForResult(ros::Duration(5.0));
-        //bool finished_before_timeout = action_client.waitForResult(); // wait forever...
-        if (!finished_before_timeout) {
-            ROS_WARN("giving up waiting on result for goal number %d",g_count);
-            return 0;
-        }
-        else {
-            ROS_INFO("finished before timeout");
-        }   
-*/
     return 0;
 }
