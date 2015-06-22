@@ -1,0 +1,100 @@
+TODO:
+
+nodes:
+Coordinator:
+   has service that responds to button clicks (crude HMI; no fdbk--only numerical codes sent to coordinator)
+
+  interacts  (via service clients) w/:
+  Reachability node
+  IM node
+  Cartesian_move_interface
+  point_cloud_processing_node
+
+all of the above helper nodes provide services; 
+
+
+Reachability:
+   provides service--expects stampedPose input;
+   service needs to know z-height, w/rt torso frame, in order to compute reachable-from-above markers
+   expect coordinator to provide heights of: table, can-top/grasp height, approach height
+   publishes result as marker (viewable in rviz)
+
+point_cloud_processing_node:
+   subscribes to: selected points and kinect point-cloud topics;
+   provides service interface: accepts codes, returns a stampedPose
+	e.g., assuming already selected relevant points,
+        rtn centroid and normal of selected pts;
+        fit table, 
+        fit can (after pt selection)
+         displays results in rviz (centroid/normal, table top, can model)
+   
+
+Interactive_marker_node:
+    provides service interface
+    e.g., w/ pose input, moves marker to provided pose
+    keeps track of manual interactions with marker;
+    upon service request, returns pose of marker
+
+Cartesian-move interface:
+  *plan move from xxx to yyy type zzz
+       (e.g., from current pose to destination pose, using wrist Cartesian move)
+  *preview moves
+  *execute moves
+  
+OPERATOR'S SEQUENCE:
+  
+*CLICK button to go to pre-pose; (cartesian move interface)
+
+*SELECT points on table (rviz)
+  *PCL node subscribes and computes centroid and normal automatically
+
+(PCL service interactions)
+*CLICK button to find table top 
+   (service rqst; get back centroid and normal)
+   PCL paints the table top
+   re-do if not good
+*CLICK button to find points above table (constrained)
+*CLICK button to fit can model
+
+Interactive marker node:
+*CLICK button to move marker to top of can
+*optionally, MOVE the IM interactively (edit computation result)
+
+Reachability node:
+*CLICK button to paint reachability w/rt current marker
+*CLICK button to paint reachability above marker (approach affordances)
+
+
+Cartesian move interface
+*CLICK button to plan path to approach pose
+(*CLICK button to preview move)
+*CLICK button to execute planned path
+*CLICK button to plan approach move
+(*CLICK preview: same button)
+*CLICK execute planned path (same button)
+*CLICK close gripper button
+*CLICK click button to plan depart move
+(*CLICK preview)
+*CLICK execute
+
+
+IM node:
+  *CLICK button to move IM to can grasp height above table plane
+
+reachability node:
+   *display reachability at grasp height
+   *display reachability at approach height?
+
+Cartesian move interface:
+*CLICK button to plan horizontal motion to approach height, based on IM;
+*CLICK preview
+*CLICK execute
+*CLICK button to plan vertical motion to drop-off height (based on IM)
+*CLICK preview
+*CLICK execute
+*CLICK open gripper
+*CLICK depart
+*CLICK return to mantis pre-pose ("ready" pose)
+
+
+
