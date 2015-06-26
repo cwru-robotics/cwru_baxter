@@ -7,8 +7,8 @@
 #include <geometry_msgs/Point.h>
 #include <cwru_srv/IM_node_service_message.h>
 
-const int GET_CURRENT_MARKER_POSE=0;
-const int SET_NEW_MARKER_POSE= 1;
+const int IM_GET_CURRENT_MARKER_POSE=0;
+const int IM_SET_NEW_MARKER_POSE= 1;
 
 
 geometry_msgs::Point g_current_point;
@@ -26,7 +26,7 @@ bool IM6DofSvcCB(cwru_srv::IM_node_service_messageRequest& request, cwru_srv::IM
     //if busy, refuse new requests;
 
     // for a simple status query, handle it now;
-    if (request.cmd_mode == GET_CURRENT_MARKER_POSE) {
+    if (request.cmd_mode == IM_GET_CURRENT_MARKER_POSE) {
         ROS_INFO("IM6DofSvcCB: rcvd request for query--GET_CURRENT_MARKER_POSE"); 
         response.poseStamped_IM_current.header.stamp = g_marker_time;
         response.poseStamped_IM_current.header.frame_id = "torso";
@@ -36,7 +36,7 @@ bool IM6DofSvcCB(cwru_srv::IM_node_service_messageRequest& request, cwru_srv::IM
     }    
     
     //command to move the marker to specified pose:
-     if (request.cmd_mode == SET_NEW_MARKER_POSE) {
+     if (request.cmd_mode == IM_SET_NEW_MARKER_POSE) {
          geometry_msgs::PoseStamped poseStamped_IM_desired;
          ROS_INFO("IM6DofSvcCB: rcvd request for action--SET_NEW_MARKER_POSE"); 
         g_current_point =  request.poseStamped_IM_desired.pose.position;
