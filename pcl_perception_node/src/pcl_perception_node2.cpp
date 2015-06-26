@@ -9,6 +9,17 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h> 
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/Quaternion.h>
+#include <geometry_msgs/Transform.h>
+#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Vector3.h>
+#include <geometry_msgs/Wrench.h>
+#include <std_msgs/Float64MultiArray.h>
+#include <geometry_msgs/Point.h>
+#include <geometry_msgs/Pose.h>
+//#include <tf_eigen.h>
+//#include <tf_conversions.h>
+
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
@@ -19,9 +30,11 @@
 #include <pcl/PCLPointCloud2.h>
 
 #include <cwru_srv/simple_int_service_message.h> // this is a pre-defined service message, contained in shared "cwru_srv" package
+#include <cwru_srv/IM_node_service_message.h>
 
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
@@ -112,7 +125,7 @@ Eigen::Vector3f g_patch_centroid;
 Eigen::Vector3f g_plane_normal;
 Eigen::Vector3f g_plane_origin;
 Eigen::Vector3f g_patch_origin;
-Eigen::Affine3f g_A_plane;
+Eigen::Affine3f g_A_plane,g_A_model;
 double g_z_plane_nom;
 std::vector<int> g_indices_of_plane; //indices of patch that do not contain outliers 
 
@@ -520,6 +533,39 @@ bool modeService(cwru_srv::simple_int_service_messageRequest& request, cwru_srv:
     return true;
 }
 
+bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv::IM_node_service_messageResponse& response ) {
+    ROS_INFO("pcl_perception_node: received request for frame");
+    //if pay attention to input codes, could choose what frame to return
+    // by default, return the frame of the model (can)
+    cout<<"model frame origin (w/rt sensor frame)"<<g_A_model.translation().transpose()<<endl;
+    cout<<"model frame orientation: "<<endl;
+    cout<<g_A_model.linear()<<endl;
+    geometry_msgs::Pose pose;
+    geometry_msgs::PoseStamped poseStamped;
+    //tf::poseEigenToMsg 	(g_A_model,pose);
+    
+    Eigen::Quaternionf quat(g_A_model.linear());
+    Eigen::Vector3f origin(g_A_model.translation());
+    //origin = g_A_model.translation();    
+    //quat = g_A_model.linear();
+    ROS_INFO("quaternion: %f, %f, %f, %f", quat.x(),quat.y(),quat.z(),quat.w());
+    //ROS_INFO("origin...");
+    cout<<"origin: "<<origin.transpose()<<endl; 
+    //cout<<"quaternion: "<<quat<<endl;
+    poseStamped.pose.orientation.x =  quat.x();
+    poseStamped.pose.orientation.y =  quat.y();    
+    poseStamped.pose.orientation.z =  quat.z();
+    poseStamped.pose.orientation.w =  quat.w();
+
+    poseStamped.pose.position.x = origin[0];
+    poseStamped.pose.position.y = origin[1];
+    poseStamped.pose.position.z = origin[2]; 
+    poseStamped.header.stamp = ros::Time().now();
+    poseStamped.header.frame_id = "kinect_pc_frame";
+    // need to convert this frame to a poseStamped and put into response
+    response.poseStamped_IM_current = poseStamped;
+}
+
 // this callback wakes up when a new "selected Points" message arrives
 void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclKinect(new PointCloud<pcl::PointXYZ>);    
@@ -581,7 +627,7 @@ int main(int argc, char** argv) {
 
     // service used to interactively change processing modes
     ros::ServiceServer service = nh.advertiseService("pcl_perception_svc", modeService);
-
+    ros::ServiceServer frame_service = nh.advertiseService("pcl_getframe_svc", getFrameService);
     std::vector<int> indices_pts_above_plane;
 
 /*
@@ -678,6 +724,7 @@ int main(int argc, char** argv) {
                     cout<<g_R_transform<<endl;
                     A_plane_to_sensor.linear() = g_R_transform;
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    g_A_model = A_plane_to_sensor;
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
  
                     break;
@@ -697,6 +744,7 @@ int main(int argc, char** argv) {
                     //cout<<"R_xform: "<<g_R_transform<<endl;
                     g_cylinder_origin=    g_A_plane*can_center_wrt_plane; 
                     A_plane_to_sensor.translation() = g_cylinder_origin;
+                    g_A_model = A_plane_to_sensor;
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
                     //g_canCloud
                   
