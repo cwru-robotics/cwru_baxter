@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 2.8.3)
 project(coordinator)
 
 find_package(catkin_simple REQUIRED)
+#need the following to use Eigen--careful of case sensitivity and version 3
 find_package(Eigen3 REQUIRED)
 
-include_directories(${Eigen3_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
 add_definitions(${EIGEN_DEFINITIONS})
 catkin_simple()
 
