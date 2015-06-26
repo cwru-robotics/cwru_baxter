@@ -63,7 +63,7 @@ private:
     geometry_msgs::PoseStamped g_poseStamped_start_rqst;
     geometry_msgs::PoseStamped g_poseStamped_goal_rqst;
 
-    int g_command_mode=TEST_MODE;
+    int g_command_mode=ARM_TEST_MODE;
     int g_plan_id_rqst = 0;
     int g_plan_id_resp = 0;
     bool g_bool_resp = false;
@@ -173,28 +173,28 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     //if busy, refuse new requests;
     if(g_busy_working_on_a_request||g_received_new_request) {
         response.bool_resp = false; // dummy; //working_on_trajectory; // return status of "working on trajectory"
-        response.rtn_code = REQUEST_REJECTED_ALREADY_BUSY;
+        response.rtn_code = ARM_REQUEST_REJECTED_ALREADY_BUSY;
         return false;  //redundant way to say request was rejected      
     }
     
     // for a simple status query, handle it now;
-    if (request.cmd_mode == IS_SERVER_BUSY_QUERY) {
+    if (request.cmd_mode == ARM_IS_SERVER_BUSY_QUERY) {
         ROS_INFO("rcvd request for query--IS_SERVER_BUSY_QUERY"); 
         if (g_busy_working_on_a_request) {
-            response.rtn_code = SERVER_IS_BUSY;
+            response.rtn_code = ARM_SERVER_IS_BUSY;
         }
         else {
-            response.rtn_code = SERVER_NOT_BUSY;
+            response.rtn_code = ARM_SERVER_NOT_BUSY;
         }
         return true;  
     }
     
     //quick command requesting the internal value of q_start:
-     if (request.cmd_mode == GET_Q_DATA) {
+     if (request.cmd_mode == ARM_GET_Q_DATA) {
          ROS_INFO("rcvd request for query--GET_Q_DATA"); 
          pack_qstart(response);
          pack_qend(response);
-         response.rtn_code = RECEIVED_AND_COMPLETED_RQST;
+         response.rtn_code = ARM_RECEIVED_AND_COMPLETED_RQST;
         return true;  
     }   
     
@@ -214,7 +214,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     g_plan_id_rqst = request.plan_id;
     */
     response.bool_resp = true; // dummy; //working_on_trajectory; // return status of "working on trajectory"
-    response.rtn_code = RECEIVED_AND_INITIATED_RQST;
+    response.rtn_code = ARM_RECEIVED_AND_INITIATED_RQST;
     return true;
 }
 
@@ -327,6 +327,8 @@ void doneCb(const actionlib::SimpleClientGoalState& state,
     ROS_INFO("got return val = %d; traj_id = %d",result->return_val,result->traj_id);
 }
 
+
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "test_cart_path_planner_lib");
     ros::NodeHandle nh; //standard ros node handle   
@@ -396,7 +398,7 @@ int main(int argc, char** argv) {
             }
             if (armMotionInterface.isBusy()) {
                 switch (armMotionInterface.get_cmd_mode()) {
-                    case TEST_MODE: 
+                    case ARM_TEST_MODE: 
                         ROS_INFO("responding to request TEST_MODE: ");
                         cout<<"unpacking q_vec_start from request message..."<<endl;
                         unpackok = armMotionInterface.unpack_qstart();
@@ -412,12 +414,12 @@ int main(int argc, char** argv) {
                         armMotionInterface.setIsBusy(false);
                         break;
                          
-                    case PLAN_PATH_CURRENT_TO_PRE_POSE : 
+                    case ARM_PLAN_PATH_CURRENT_TO_PRE_POSE : 
                         ROS_INFO("responding to request PLAN_PATH_CURRENT_TO_PRE_POSE");
                         armMotionInterface.plan_path_to_predefined_pre_pose();
                         armMotionInterface.setIsBusy(false);
                         break;
-                    case DESCEND_20CM:
+                    case ARM_DESCEND_20CM:
                         ROS_INFO("responding to request DESCEND_20CM");
                         delta_p << 0,0,-0.2; //specify delta-p for a 20cm descent
                         // find a joint-space path to do this, holding R fixed
@@ -435,13 +437,32 @@ int main(int argc, char** argv) {
                         armMotionInterface.incrementPathID();
                         armMotionInterface.setIsBusy(false);
                         break;
+                     case ARM_DEPART_20CM:
+                        ROS_INFO("responding to request ARM_DEPART_20CM");
+                        delta_p << 0,0,0.2; //specify delta-p for a 20cm descent
+                        // find a joint-space path to do this, holding R fixed
+
+                        cout<<"getting current right-arm pose:"<<endl;
+                        g_q_vec_right_arm[0] = 1000;
+                        while (fabs(g_q_vec_right_arm[0])>3) { // keep trying until see viable value populated by fnc
+                            g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
+                            ros::spinOnce();
+                            ros::Duration(0.01).sleep();
+                        }
+                        
+                        is_valid = armMotionInterface.plan_cartesian_delta_p(g_q_vec_right_arm,delta_p);
+                        armMotionInterface.setPathValid(is_valid);
+                        armMotionInterface.incrementPathID();
+                        armMotionInterface.setIsBusy(false);
+                        break;
+                        
                     //case DEPART_20CM:
                     //case CART_MOVE_DELTA_P: unpack_delta_p()...
                     //case PLAN_PATH_QSTART_TO_ADES:
                     //case PLAN_PATH_QSTART_TO_QGOAL:
                     //case PLAN_PATH_ASTART_TO_QGOAL:
 
-                    case EXECUTE_PLANNED_PATH: //assumes there is a valid planned path in g_optimal_path
+                    case ARM_EXECUTE_PLANNED_PATH: //assumes there is a valid planned path in g_optimal_path
                         ROS_INFO("responding to request EXECUTE_PLANNED_PATH");
                         // convert path to a trajectory:
                         baxter_traj_streamer.stuff_trajectory(g_optimal_path, g_des_trajectory); //convert from vector of 7dof poses to trajectory message   

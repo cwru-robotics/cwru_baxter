@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     a_tool_des.translation() = p;
 
     // populate a service request message:
-    arm_nav_srv_msg.request.cmd_mode = TEST_MODE;
+    arm_nav_srv_msg.request.cmd_mode = ARM_TEST_MODE;
     //populate the service message with value for q_vec_start
     arm_nav_srv_msg.request.q_vec_start.clear();
     for (int i=0;i<7;i++) {
@@ -60,13 +60,13 @@ int main(int argc, char **argv) {
     
     
     // request plan from current pose to pre-pose: this will set start and end j-space poses
-    arm_nav_srv_msg.request.cmd_mode = PLAN_PATH_CURRENT_TO_PRE_POSE;
+    arm_nav_srv_msg.request.cmd_mode = ARM_PLAN_PATH_CURRENT_TO_PRE_POSE;
     cout<<"sending request PLAN_PATH_CURRENT_TO_PRE_POSE"<<endl;
     arm_nav_svc_client.call(arm_nav_srv_msg);   
-    int status = SERVER_IS_BUSY;
+    int status = ARM_SERVER_IS_BUSY;
     cout<<"waiting for not busy..."<<endl;
-    while (status != SERVER_NOT_BUSY) {
-        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+    while (status != ARM_SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = ARM_IS_SERVER_BUSY_QUERY;
         arm_nav_svc_client.call(arm_nav_srv_msg); 
         status = arm_nav_srv_msg.response.rtn_code;
         cout<<"status code: "<<status<<endl;
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     
     //try a query: are internal values of q_start and q_end used by motion interface?
     cout<<"sending q-data inquiry: "<<endl;
-    arm_nav_srv_msg.request.cmd_mode = GET_Q_DATA;
+    arm_nav_srv_msg.request.cmd_mode = ARM_GET_Q_DATA;
     arm_nav_svc_client.call(arm_nav_srv_msg);
     //interpret the response data:
     cout<<"response.rtn_code: "<<arm_nav_srv_msg.response.rtn_code<<endl;
@@ -94,28 +94,28 @@ int main(int argc, char **argv) {
     }
     
         // populate a service request message: plan a relative cartesian move
-    arm_nav_srv_msg.request.cmd_mode = DESCEND_20CM;
+    arm_nav_srv_msg.request.cmd_mode = ARM_DESCEND_20CM;
     //populate the service message with value for q_vec_start
     arm_nav_srv_msg.request.q_vec_start.clear();
     arm_nav_svc_client.call(arm_nav_srv_msg);
     
     // when ready, tell the interface to execute the path:
-     arm_nav_srv_msg.request.cmd_mode = DESCEND_20CM;
+     arm_nav_srv_msg.request.cmd_mode = ARM_DESCEND_20CM;
 
-   status = SERVER_IS_BUSY;
+   status = ARM_SERVER_IS_BUSY;
     cout<<"waiting for not busy..."<<endl;
-    while (status != SERVER_NOT_BUSY) {
-        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+    while (status != ARM_SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = ARM_IS_SERVER_BUSY_QUERY;
         arm_nav_svc_client.call(arm_nav_srv_msg); 
         status = arm_nav_srv_msg.response.rtn_code;
         cout<<"status code: "<<status<<endl;
     }     
-    arm_nav_srv_msg.request.cmd_mode = EXECUTE_PLANNED_PATH;
+    arm_nav_srv_msg.request.cmd_mode = ARM_EXECUTE_PLANNED_PATH;
     arm_nav_svc_client.call(arm_nav_srv_msg);
-   status = SERVER_IS_BUSY;
+   status = ARM_SERVER_IS_BUSY;
     cout<<"waiting for not busy..."<<endl;
-    while (status != SERVER_NOT_BUSY) {
-        arm_nav_srv_msg.request.cmd_mode = IS_SERVER_BUSY_QUERY;
+    while (status != ARM_SERVER_NOT_BUSY) {
+        arm_nav_srv_msg.request.cmd_mode = ARM_IS_SERVER_BUSY_QUERY;
         arm_nav_svc_client.call(arm_nav_srv_msg); 
         status = arm_nav_srv_msg.response.rtn_code;
         cout<<"status code: "<<status<<endl;
