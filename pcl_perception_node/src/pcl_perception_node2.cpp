@@ -51,13 +51,13 @@
 //#include <pcl_perception_node/pcl_perception_defs.h>
 /**/
  //define some processing modes; set these interactively via service
-const int IDENTIFY_PLANE = 0;
-const int FIND_PNTS_ABOVE_PLANE = 1;
-const int COMPUTE_CYLINDRICAL_FIT_ERR_INIT = 2;
-const int COMPUTE_CYLINDRICAL_FIT_ERR_ITERATE = 3;
-const int MAKE_CAN_CLOUD = 4;
-const int FIND_ON_TABLE = 5;
-const int TAKE_SNAPSHOT = 6;
+const int PCL_IDENTIFY_PLANE = 0;
+const int PCL_FIND_PNTS_ABOVE_PLANE = 1;
+const int PCL_COMPUTE_CYLINDRICAL_FIT_ERR_INIT = 2;
+const int PCL_COMPUTE_CYLINDRICAL_FIT_ERR_ITERATE = 3;
+const int PCL_MAKE_CAN_CLOUD = 4;
+const int PCL_FIND_ON_TABLE = 5;
+const int PCL_TAKE_SNAPSHOT = 6;
 
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
@@ -114,7 +114,7 @@ Eigen::Matrix3f g_R_transform; // a matrix useful for rotating the data
 
 Eigen::Vector3f g_cylinder_origin; // origin of model for cylinder registration
 
-int g_pcl_process_mode = TAKE_SNAPSHOT; // mode--set by service
+int g_pcl_process_mode = PCL_TAKE_SNAPSHOT; // mode--set by service
 bool g_trigger = true; // a trigger, to tell "main" to process points in the currently selected mode
 bool g_processed_patch = false; // a state--to let us know if a default set of plane_parameters exists
 bool g_take_snapshot = true; // let kinect CB save data ONLY when desired
@@ -662,7 +662,7 @@ int main(int argc, char** argv) {
             g_trigger = false; // reset the trigger
 
             switch (g_pcl_process_mode) { // what we do here depends on our mode; mode is settable via a service
-                case TAKE_SNAPSHOT:
+                case PCL_TAKE_SNAPSHOT:
                     ROS_INFO("case TAKE_SNAPSHOT:");
                     g_take_snapshot=true;
                     //TEST TEST TEST:
@@ -670,17 +670,17 @@ int main(int argc, char** argv) {
                     //g_pcl_process_mode=MAKE_CAN_CLOUD;
                     
                     break;
-                case MAKE_CAN_CLOUD:
+                case PCL_MAKE_CAN_CLOUD:
                     ROS_INFO("creating a can cloud");
                     make_can_cloud(g_display_cloud, R_CYLINDER, H_CYLINDER);
                     break;
                     /**/
-                case IDENTIFY_PLANE:
+                case PCL_IDENTIFY_PLANE:
                     ROS_INFO("MODE 0: identifying plane based on patch selection...");
                     find_plane(g_plane_params, g_indices_of_plane); // results in g_display_cloud (in orig frame), as well as 
                     //g_cloud_transformed (rotated version of original cloud); g_indices_of_plane indicate points on the plane
                     break;
-                case FIND_PNTS_ABOVE_PLANE:
+                case PCL_FIND_PNTS_ABOVE_PLANE:
                     ROS_INFO("filtering for points above identified plane");
                     // w/ affine transform, z-coord of points on plane (in plane frame) should be ~0
                     z_threshold = 0.0+Z_EPS; //g_plane_params[3] + Z_EPS;
@@ -690,7 +690,7 @@ int main(int argc, char** argv) {
                     //extract these points--but in original, non-rotated frame; useful for display
                     copy_cloud(g_pclKinect, indices_pts_above_plane, g_display_cloud);
                     break;
-                case COMPUTE_CYLINDRICAL_FIT_ERR_INIT:
+                case PCL_COMPUTE_CYLINDRICAL_FIT_ERR_INIT:
                     //double cx,cy;
                     // base coords on centroid of most recent patch, and offset normal to this patch by radius of cylinder
                     ROS_INFO("creating a can cloud");
@@ -728,7 +728,7 @@ int main(int argc, char** argv) {
                     transform_cloud(g_canCloud, A_plane_to_sensor, g_display_cloud);
  
                     break;
-                case COMPUTE_CYLINDRICAL_FIT_ERR_ITERATE:         
+                case PCL_COMPUTE_CYLINDRICAL_FIT_ERR_ITERATE:         
                         cout<<"current cx,cy = "<<can_center_wrt_plane[0]<<", "<<can_center_wrt_plane[1]<<endl;
                         //cout<<"enter new cx: ";
                         //cin>>cx;
@@ -752,7 +752,7 @@ int main(int argc, char** argv) {
                     
 
 
-                case FIND_ON_TABLE:
+                case PCL_FIND_ON_TABLE:
                     ROS_INFO("filtering for objects on most recently defined plane: not implemented yet");
 
                     break;
