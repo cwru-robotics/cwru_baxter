@@ -47,36 +47,54 @@ cwru_srv::simple_float_service_message reachability_msg;
 const int RQST_DO_NOTHING = 0;
 const int RQST_DISPLAY_REACHABILITY_AT_MARKER_HEIGHT = 1;
 const int RQST_COMPUTE_MOVE_ARM_TO_PRE_POSE = 2;
-const int RQST_MOVE_ARM_TO_APPROACH_POSE = 3;
-const int RQST_MOVE_ARM_TO_GRASP_POSE = 4;
-const int RQST_MOVE_ARM_DEPART = 5;
-const int RQST_MOVE_ARM_TO_MARKER = 6;
+const int RQST_COMPUTE_MOVE_ARM_TO_APPROACH_POSE = 3;
+const int RQST_COMPUTE_MOVE_ARM_TO_GRASP_POSE = 4;
+const int RQST_COMPUTE_MOVE_ARM_DEPART = 5;
+const int RQST_COMPUTE_MOVE_ARM_TO_MARKER = 6;
 const int RQST_MOVE_MARKER_TO_GRASP_POSE = 7;
-const int RQST_DO_PLANNED_PATH=8;
+const int RQST_EXECUTE_PLANNED_PATH=8;
 const int RQST_DESCEND_20CM=9;
 const int RQST_ASCEND_20CM=10;
+
+const int RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE = 11;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
 const int ARM_TEST_MODE =0;
-const int ARM_GO_TO_PREDFINED_PRE_POSE=1;
-const int ARM_DESCEND_20CM=2;
-const int ARM_DEPART_20CM=3;
+//queries: 
 const int ARM_IS_SERVER_BUSY_QUERY = 1;
-const int ARM_PLAN_PATH_QSTART_TO_ADES = 4;
-const int ARM_PLAN_PATH_QSTART_TO_QGOAL = 5;
-const int ARM_PLAN_PATH_ASTART_TO_QGOAL = 6;
-const int ARM_PLAN_PATH_CURRENT_TO_PRE_POSE=7;
-const int ARM_GET_Q_DATA = 8;
-const int ARM_EXECUTE_PLANNED_PATH = 9;
+const int ARM_QUERY_IS_PATH_VALID = 2;
+const int ARM_GET_Q_DATA = 3;
 
-//and arm server response codes
+
+//requests for motion plans:
+const int ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE=20; //plan paths from current arm pose
+const int ARM_PLAN_PATH_CURRENT_TO_PRE_POSE=21;
+
+
+const int ARM_PLAN_JSPACE_PATH_CURRENT_TO_PRE_POSE=22;
+const int ARM_PLAN_JSPACE_PATH_CURRENT_TO_QGOAL=23;
+
+const int ARM_PLAN_PATH_QSTART_TO_QGOAL = 25;
+const int ARM_PLAN_PATH_QSTART_TO_ADES = 24; //specify start and end, j-space or hand pose
+
+const int ARM_PLAN_PATH_ASTART_TO_QGOAL = 26;
+
+
+//MOVE command!
+const int ARM_EXECUTE_PLANNED_PATH = 100;
+const int ARM_DESCEND_20CM=101;
+const int ARM_DEPART_20CM=102;
+
+//response codes...
 const int ARM_STATUS_UNDEFINED=0;
 const int ARM_RECEIVED_AND_INITIATED_RQST=1;
 const int ARM_REQUEST_REJECTED_ALREADY_BUSY=2;
 const int ARM_SERVER_NOT_BUSY=3;
 const int ARM_SERVER_IS_BUSY=4;
 const int ARM_RECEIVED_AND_COMPLETED_RQST=5;
+const int ARM_PATH_IS_VALID=6;
+const int ARM_PATH_NOT_VALID=7;
 
 
 bool g_trigger = false;
@@ -140,15 +158,21 @@ geometry_msgs::PoseStamped poseStamped;
 
 bool arm_server_busy_wait_done() {
     int status= ARM_SERVER_IS_BUSY;
+    int nwaits=0;
     cout<<"waiting on arm server: ";
     while (status != ARM_SERVER_NOT_BUSY) {
         arm_nav_msg.request.cmd_mode = ARM_IS_SERVER_BUSY_QUERY;
         g_arm_interface_svc_client.call(arm_nav_msg); 
         status = arm_nav_msg.response.rtn_code;
         cout<<".";
+        nwaits++;
         //cout<<"status code: "<<status<<endl;
         ros::spinOnce();
         ros::Duration(0.1).sleep();
+        if (nwaits>50) {
+            ROS_WARN("coord: giving up waiting on arm interface");
+            return false;
+        }
     }
     cout<<"done"<<endl;
     return true;
@@ -186,6 +210,10 @@ int main(int argc, char **argv) {
     
     geometry_msgs::Quaternion quat_gripper_down = quaternion_from_R(R_flange_down);
     
+    //define a pre-pose in this node; note--may not be same as pre-pose in arm interface node
+    Eigen::Matrix<double, 7, 1> coord_pre_pose;
+    coord_pre_pose<< -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, -2.87179;   
+    
     tf::TransformListener tfListener;
     g_tfListener_ptr = &tfListener;
     
@@ -222,7 +250,7 @@ int main(int argc, char **argv) {
     ros::ServiceServer service = nh.advertiseService("coordinator_svc", coordinatorService);
     double des_z_height=0.0;
 
-    
+    bool wait_done=true;
     geometry_msgs::Quaternion quaternion;
     while (ros::ok()) {
         if (g_trigger) {
@@ -264,7 +292,7 @@ int main(int argc, char **argv) {
                     // compute/display reachability at marker height:
                     reachability_msg.request.request_float32 = des_z_height;
                     reachability_svc_client.call(reachability_msg);  
-                    //arm_server_busy_wait_done(); // no...don't wait on arm server!
+                    //arm_server_busy_wait_done(); // no...don't wait on arm server!  wait on reachability
                     
                     break;
                 case RQST_COMPUTE_MOVE_ARM_TO_PRE_POSE:
@@ -272,11 +300,33 @@ int main(int argc, char **argv) {
                     arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_PRE_POSE;
                     g_arm_interface_svc_client.call(arm_nav_msg); //need error checking here
                     arm_server_busy_wait_done();
-                    arm_nav_msg.request.cmd_mode= ARM_GO_TO_PREDFINED_PRE_POSE;
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
                     g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                    }
                     break;
-                case RQST_DO_PLANNED_PATH:
-                    ROS_INFO("case RQST_DO_PLANNED_PATH");
+                case RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE:
+                     ROS_INFO("case RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE");
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_JSPACE_PATH_CURRENT_TO_QGOAL; //ARM_PLAN_JSPACE_PATH_CURRENT_TO_PRE_POSE;
+                    //need to fill in goal:
+                    arm_nav_msg.request.q_vec_end.resize(7);
+                    for (int i=0;i<7;i++ )  {
+                        arm_nav_msg.request.q_vec_end[i] = coord_pre_pose[i];
+                    }
+                    g_arm_interface_svc_client.call(arm_nav_msg); //need error checking here
+                    arm_server_busy_wait_done();
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                    }                   
+                    break;
+                    
+                case RQST_EXECUTE_PLANNED_PATH:
+                    ROS_INFO("case RQST_EXECUTE_PLANNED_PATH");
                     arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
                     g_arm_interface_svc_client.call(arm_nav_msg);
                     arm_server_busy_wait_done();
@@ -294,27 +344,40 @@ int main(int argc, char **argv) {
                     arm_server_busy_wait_done();
                     break;
                     
-                case RQST_MOVE_ARM_TO_APPROACH_POSE:
-                    ROS_INFO("case RQST_MOVE_ARM_TO_APPROACH_POSE; doing nothing!");
+                case RQST_COMPUTE_MOVE_ARM_TO_APPROACH_POSE:
+                    ROS_INFO("case RQST_COMPUTE_MOVE_ARM_TO_APPROACH_POSE; doing nothing!");
                     break;
-                case RQST_MOVE_ARM_TO_GRASP_POSE:
-                    ROS_INFO("case RQST_MOVE_ARM_TO_GRASP_POSE; doing nothing!");
+                case RQST_COMPUTE_MOVE_ARM_TO_GRASP_POSE:
+                    ROS_INFO("case RQST_COMPUTE_MOVE_ARM_TO_GRASP_POSE; doing nothing!");
                     arm_server_busy_wait_done();
                     break;
-                case RQST_MOVE_ARM_DEPART:
-                    ROS_INFO("case RQST_MOVE_ARM_DEPART; doing nothing!");
+                case RQST_COMPUTE_MOVE_ARM_DEPART:
+                    ROS_INFO("case RQST_COMPUTE_MOVE_ARM_DEPART; doing nothing!");
                     arm_server_busy_wait_done();
                     break;
-                case RQST_MOVE_ARM_TO_MARKER:
-                    ROS_INFO("RQST_MOVE_ARM_TO_MARKER: I should move arm to marker pose");
+                case RQST_COMPUTE_MOVE_ARM_TO_MARKER: //misonomer--this is a request to compute a plan
+                    ROS_INFO("RQST_COMPUTE_MOVE_ARM_TO_MARKER: planning move to marker pose");
                     IM_6dof_srv_msg.request.cmd_mode = IM_GET_CURRENT_MARKER_POSE;
                     status = IM_6dof_svc_client.call(IM_6dof_srv_msg);
                     ROS_INFO("got current marker pose: x,y,z = %f, %f, %f",
                             IM_6dof_srv_msg.response.poseStamped_IM_current.pose.position.x,
                             IM_6dof_srv_msg.response.poseStamped_IM_current.pose.position.y,
                             IM_6dof_srv_msg.response.poseStamped_IM_current.pose.position.z);
+                    //fill in IM goal; arm interface will get starting pose from sensor vals
+                    arm_nav_msg.request.poseStamped_goal = IM_6dof_srv_msg.response.poseStamped_IM_current;
+                    
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE;  
 
-                    arm_server_busy_wait_done();       
+                    g_arm_interface_svc_client.call(arm_nav_msg);           
+                    wait_done=arm_server_busy_wait_done(); 
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                    }
+                    else
+                        ROS_WARN("did not compute a valid path");
                     break;
                     /**/
 
