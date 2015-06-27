@@ -408,6 +408,25 @@ bool CartTrajPlanner::cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Aff
     return true;
 }
 
+//bool CartTrajPlanner::cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path) {
+
+   bool CartTrajPlanner::jspace_trivial_path_planner(Vectorq7x1 q_start,Vectorq7x1 q_end,std::vector<Eigen::VectorXd> &optimal_path) {
+       Eigen::VectorXd qx_start(7),qx_end(7);// need to convert to this type
+       //qx_start<<0,0,0,0,0,0,0; // resize
+       //qx_end<<0,0,0,0,0,0,0;       
+       for (int i=0;i<7;i++) {
+           qx_start[i] = q_start[i];
+           qx_end[i] = q_end[i];
+       }
+       cout<<"jspace_trivial_path_planner: "<<endl;
+       cout<<"q_start: "<<qx_start.transpose()<<endl;
+       cout<<"q_end: "<<qx_end.transpose()<<endl;
+       optimal_path.clear();
+       optimal_path.push_back(qx_start);
+       optimal_path.push_back(qx_end);
+       return true;
+   }
+   
 // use this classes baxter fk solver to compute and return tool-flange pose w/rt torso, given right-arm joint angles
 Eigen::Affine3d CartTrajPlanner::get_fk_Affine_from_qvec(Vectorq7x1 q_vec) {
     Eigen::Affine3d Affine_pose;

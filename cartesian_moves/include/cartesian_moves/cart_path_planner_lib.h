@@ -55,6 +55,7 @@ public:
     /// alt version--only plan wrist-point motion; don't worry about wrist orientation
     bool cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path);
     
+    bool jspace_trivial_path_planner(Vectorq7x1 q_start,Vectorq7x1 q_end,std::vector<Eigen::VectorXd> &optimal_path);
     /// alt version: specify start as a q_vec, and desired z motion (+ is up) while holding x,y and R fixed
     //bool cartesian_path_planner_zmotion(Vectorq7x1 q_start,double z_dist, std::vector<Eigen::VectorXd> &optimal_path);
     ///alt version: compute path from current pose with cartesian move of delta_p with R fixed
