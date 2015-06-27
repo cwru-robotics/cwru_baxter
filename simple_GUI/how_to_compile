@@ -1,0 +1,7 @@
+
+gcc -o service_call_gui service_call_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
+
+make sure the "glade" file and service_call_gui.c are in the same dir;
+execute from this dir w/: ./service_call_gui
+
+
