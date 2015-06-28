@@ -62,9 +62,10 @@ add_service_files(
   FILES
   simple_bool_service_message.srv
   simple_int_service_message.srv
+  simple_float_service_message.srv
   arm_nav_service_message.srv
   IM_node_service_message.srv
-  simple_float_service_message.srv
+
   )
 
 ## Generate actions in the 'action' folder
