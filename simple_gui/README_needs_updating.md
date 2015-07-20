@@ -1,4 +1,5 @@
 Example (quick hack) GUI for (hard-coded) service calls:
+This folder contains a package.xml file, just to the executable can be run from here.
 
 Here is a tool to streamline some of our robot interfacing.
 
