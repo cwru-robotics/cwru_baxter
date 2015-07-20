@@ -1,0 +1,20 @@
+<launch>
+
+<include file ="$(find baxter_gazebo)/launch/baxter_world.launch"/>
+
+<node pkg="reachability" type="reachability_from_above_v2" name="reachability_from_above_v2"/>
+<node pkg="baxter_traj_streamer" type="traj_interpolator_as" name="traj_interpolator_as"/>
+<node pkg="cartesian_moves" type="cart_traj_as" name="cart_traj_as"/>
+
+<node pkg="interactive_marker_node" type="interactive_marker_node" name="interactive_marker_node"/>
+<node pkg="coordinator" type="coordinator" name="coordinator"/>
+<node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/>
+<node pkg="rviz" type="rviz" name="rviz"/>
+<!--node pkg="simple_GUI" type="service_call_gui" name="service_call_gui"/-->
+  <!-- Publish a static transform between the world and the base of the robot -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_world" args="0 0 0 0 0 0 0 world base" />
+  <!-- wsn: transform for kinect -->
+<node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0  0 0 0 1 kinect_link camera_link 100"/>
+
+
+</launch>
