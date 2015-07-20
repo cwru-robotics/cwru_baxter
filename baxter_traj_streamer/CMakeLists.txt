@@ -94,7 +94,7 @@ add_action_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
-   actionlib_msgs trajectory_msgs std_msgs)
+   actionlib_msgs trajectory_msgs std_msgs cwru_srv)
 #   sensor_msgs#   std_msgs#   trajectory_msgs
 # )
 
@@ -145,31 +145,31 @@ include_directories(
  )
 ## Declare a cpp executable
 # add_executable(baxter_traj_streamer_node src/baxter_traj_streamer_node.cpp)
-add_executable(baxter_traj_streamer_test_main src/baxter_traj_streamer_test_main.cpp)
-add_executable(baxter_traj_interpolator_node src/baxter_traj_interpolator_node.cpp)
-add_executable(elbow_orbit_plan_main src/elbow_orbit_plan_main.cpp)
-add_executable(elbow_orbit_plan_main2 src/elbow_orbit_plan_main2.cpp)
-add_executable(test_init_cmd src/test_init_cmd_main.cpp)
+#add_executable(baxter_traj_streamer_test_main src/baxter_traj_streamer_test_main.cpp)
+#add_executable(baxter_traj_interpolator_node src/baxter_traj_interpolator_node.cpp)
+#add_executable(elbow_orbit_plan_main src/elbow_orbit_plan_main.cpp)
+#add_executable(elbow_orbit_plan_main2 src/elbow_orbit_plan_main2.cpp)
+#add_executable(test_init_cmd src/test_init_cmd_main.cpp)
 add_executable(traj_interpolator_as src/traj_interpolator_as.cpp)
-add_executable(traj_action_client src/traj_action_client.cpp)
+#add_executable(traj_action_client src/traj_action_client.cpp)
 add_executable(traj_action_client_pre_pose src/traj_action_client_pre_pose.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(baxter_traj_streamer_node baxter_traj_streamer_generate_messages_cpp)
-
+add_dependencies(traj_action_client_pre_pose baxter_traj_streamer_generate_messages_cpp)
+add_dependencies(traj_interpolator_as baxter_traj_streamer_generate_messages_cpp)
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(baxter_traj_streamer_node
 #   ${catkin_LIBRARIES}
 # )
 
 #list baxter_traj_streamer explicitly, because this library is in the current package
-target_link_libraries(baxter_traj_streamer_test_main baxter_traj_streamer ${catkin_LIBRARIES})
-target_link_libraries(baxter_traj_interpolator_node  ${catkin_LIBRARIES})
-target_link_libraries(elbow_orbit_plan_main baxter_traj_streamer  ${catkin_LIBRARIES})
-target_link_libraries(elbow_orbit_plan_main2 baxter_traj_streamer  ${catkin_LIBRARIES})
-target_link_libraries(test_init_cmd baxter_traj_streamer  ${catkin_LIBRARIES})
+#target_link_libraries(baxter_traj_streamer_test_main baxter_traj_streamer ${catkin_LIBRARIES})
+#target_link_libraries(baxter_traj_interpolator_node  ${catkin_LIBRARIES})
+#target_link_libraries(elbow_orbit_plan_main baxter_traj_streamer  ${catkin_LIBRARIES})
+#target_link_libraries(elbow_orbit_plan_main2 baxter_traj_streamer  ${catkin_LIBRARIES})
+#target_link_libraries(test_init_cmd baxter_traj_streamer  ${catkin_LIBRARIES})
 target_link_libraries(traj_interpolator_as baxter_traj_streamer  ${catkin_LIBRARIES})
-target_link_libraries(traj_action_client  ${catkin_LIBRARIES})
+#target_link_libraries(traj_action_client  ${catkin_LIBRARIES})
 target_link_libraries(traj_action_client_pre_pose baxter_traj_streamer ${catkin_LIBRARIES})
 #cwru_joint_space_planner
 #############
