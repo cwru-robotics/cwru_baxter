@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   baxter_core_msgs
   roscpp
   sensor_msgs
+  moveit_msgs
   std_msgs
   trajectory_msgs
   baxter_kinematics
@@ -54,7 +55,7 @@ generate_messages(
 catkin_package(
   #INCLUDE_DIRS include 
   LIBRARIES ${PROJECT_NAME} cwru_joint_space_planner actionlib
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv   actionlib_msgs 
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs moveit_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv   actionlib_msgs 
   DEPENDS eigen system_lib actionlib
 )
 
@@ -87,6 +88,7 @@ target_link_libraries(goto_prepose ${catkin_LIBRARIES})
 target_link_libraries(cart_traj_as ${catkin_LIBRARIES})
 target_link_libraries(cart_traj_ac ${catkin_LIBRARIES})
 #target_link_libraries(test_cart_plan_lib cartesian_moves ${catkin_LIBRARIES})
+#wsn...this is the one I end up using
 target_link_libraries(arm_motion_interface cartesian_moves ${catkin_LIBRARIES})
 target_link_libraries(cartesian_move_svc_client_test ${catkin_LIBRARIES})
 cs_install()

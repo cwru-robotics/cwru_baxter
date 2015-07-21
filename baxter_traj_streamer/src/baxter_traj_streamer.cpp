@@ -137,6 +137,7 @@ void Baxter_traj_streamer::map_right_arm_joint_indices(vector<string> joint_name
 
 //NOTE: this is not separately threaded.  this callback only responds with the parent node allows a ros spin.
 void Baxter_traj_streamer::jointStatesCb(const sensor_msgs::JointState& js_msg) {
+    joint_states_ = js_msg; // copy this to member var
     if (right_arm_joint_indices.size()<1) {
        //g_all_jnt_names = js_msg.name;
        map_right_arm_joint_indices(js_msg.name);

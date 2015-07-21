@@ -20,6 +20,8 @@ const int ARM_PLAN_PATH_QSTART_TO_ADES = 24; //specify start and end, j-space or
 
 const int ARM_PLAN_PATH_ASTART_TO_QGOAL = 26;
 
+// request to preview plan:
+const int ARM_DISPLAY_TRAJECTORY = 50;
 
 //MOVE command!
 const int ARM_EXECUTE_PLANNED_PATH = 100;

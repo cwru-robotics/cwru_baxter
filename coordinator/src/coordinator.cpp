@@ -57,6 +57,7 @@ const int RQST_DESCEND_20CM=9;
 const int RQST_ASCEND_20CM=10;
 
 const int RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE = 11;
+const int RQST_PREVIEW_TRAJECTORY=12;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -65,6 +66,8 @@ const int ARM_TEST_MODE =0;
 const int ARM_IS_SERVER_BUSY_QUERY = 1;
 const int ARM_QUERY_IS_PATH_VALID = 2;
 const int ARM_GET_Q_DATA = 3;
+
+
 
 
 //requests for motion plans:
@@ -80,6 +83,8 @@ const int ARM_PLAN_PATH_QSTART_TO_ADES = 24; //specify start and end, j-space or
 
 const int ARM_PLAN_PATH_ASTART_TO_QGOAL = 26;
 
+// request to preview plan:
+const int ARM_DISPLAY_TRAJECTORY = 50;
 
 //MOVE command!
 const int ARM_EXECUTE_PLANNED_PATH = 100;
@@ -323,6 +328,12 @@ int main(int argc, char **argv) {
                     if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
                         ROS_INFO("computed a valid path");
                     }                   
+                    break;
+                case  RQST_PREVIEW_TRAJECTORY:
+                     ROS_INFO("case RQST_PREVIEW_TRAJECTORY");
+                    arm_nav_msg.request.cmd_mode= ARM_DISPLAY_TRAJECTORY; //request a trajectory preview
+                    g_arm_interface_svc_client.call(arm_nav_msg); //need error checking here
+                    arm_server_busy_wait_done();
                     break;
                     
                 case RQST_EXECUTE_PLANNED_PATH:

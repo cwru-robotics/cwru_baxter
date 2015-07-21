@@ -16,6 +16,8 @@
 #include<std_msgs/Float32.h>
 #include<geometry_msgs/PoseStamped.h>
 #include<std_msgs/Bool.h>
+#include<sensor_msgs/JointState.h>
+#include<moveit_msgs/DisplayTrajectory.h>
 
 #include <cartesian_moves/arm_motion_interface_defs.h>
 
@@ -55,6 +57,7 @@ private:
     //ros::Subscriber minimal_subscriber_; //these will be set up within the class constructor, hiding these ugly details
     ros::ServiceServer arm_motion_interface_service_;
     //ros::Publisher  minimal_publisher_;
+    //ros::Publisher  display_traj_pub_;
 
     //globals for main/callback sync:
     bool g_received_new_request = false;
@@ -97,6 +100,9 @@ private:
     //some handy constants...
     Eigen::Matrix3d g_R_gripper_down;
     Vectorq7x1 g_q_pre_pose;
+    
+    sensor_msgs::JointState joint_states_;
+    moveit_msgs::DisplayTrajectory display_trajectory_;
 
     //Baxter_IK_solver baxter_IK_solver_; // instantiate an IK solver
     Baxter_fwd_solver baxter_fwd_solver_; //instantiate a forward-kinematics solver 
@@ -201,6 +207,15 @@ void ArmMotionInterface::initializeServices() {
             this);
     // add more services here, as needed
 }
+
+//member helper function to set up publishers;
+/*
+void ArmMotionInterface::initializePublishers()
+{
+    ROS_INFO("Initializing Publishers");
+    display_traj_pub_ =  nh_.advertise<moveit_msgs::DisplayTrajectory>("/preview_traj", 1, true);
+}
+*/
 
 bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_messageResponse& response) {
     //if busy, refuse new requests;
@@ -477,7 +492,9 @@ int main(int argc, char** argv) {
     bool finished_before_timeout;
     baxter_traj_streamer::trajGoal goal;
     Vectorq7x1 q_vec_goal_vq7; //goal pose in joint space, expressed as a 7x1 vector
-    
+    moveit_msgs::DisplayTrajectory display_trajectory;
+    ros::Publisher  display_traj_pub = nh.advertise<moveit_msgs::DisplayTrajectory>("/preview_traj", 1, true);
+
     // start servicing requests:
     while (ros::ok()) {
         g_q_vec_right_arm = baxter_traj_streamer.get_qvec_right_arm(); // update the current sensed arm angles
@@ -544,6 +561,26 @@ int main(int argc, char** argv) {
                     is_valid = armMotionInterface.plan_path_qstart_to_Agoal(g_q_vec_right_arm);
                     if (is_valid) ROS_INFO("computed valid path");
                     else ROS_INFO("no valid path found");
+                    armMotionInterface.setIsBusy(false);
+                    break;
+                    
+                case ARM_DISPLAY_TRAJECTORY:
+                    cout << "getting current joint states:" << endl;
+                    g_q_vec_right_arm[0] = 1000;
+                    while (fabs(g_q_vec_right_arm[0]) > 3) { // keep trying until see viable value populated by fnc
+                        g_q_vec_right_arm = baxter_traj_streamer.get_qvec_right_arm();
+                        ros::spinOnce();
+                        ros::Duration(0.01).sleep();
+                    } 
+                    //if here, then joint_states_ is valid
+                    //populate the moveit message to preview the trajectory plan;
+                    //display_trajectory.model_id = "robot_description"; // not sure what goes here;  "baxter"??
+                    //declare joint_states_ as start state of display
+                    display_trajectory.trajectory_start.joint_state = baxter_traj_streamer.get_joint_states(); // get the joint states from Baxter; 
+                    baxter_traj_streamer.stuff_trajectory(g_optimal_path, g_des_trajectory);//convert planned path to trajectory
+                    display_trajectory.trajectory.resize(1); //display only 1 trajectory
+                    display_trajectory.trajectory[0].joint_trajectory = g_des_trajectory; //the one we care about
+                    display_traj_pub.publish(display_trajectory); // and publish this to topic "/preview_traj"
                     armMotionInterface.setIsBusy(false);
                     break;
 

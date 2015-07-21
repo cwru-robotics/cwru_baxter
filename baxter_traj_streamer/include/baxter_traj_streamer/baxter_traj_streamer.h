@@ -46,7 +46,7 @@ public:
     void pub_right_arm_trajectory(trajectory_msgs::JointTrajectory &new_trajectory);
     Vectorq7x1 get_qvec_right_arm();  
     void pub_right_arm_trajectory_init();
-
+    sensor_msgs::JointState get_joint_states() { return joint_states_;}
  private:
     // put private member data here;  "private" data will only be available to member functions of this class;
     ros::NodeHandle nh_; // we will need this, to pass between "main" and constructor
@@ -61,6 +61,7 @@ public:
     double val_to_remember_; // member variables will retain their values even as callbacks come and go
     Vectorq7x1 q_vec_right_arm_; //,q_in,q_soln,q_snapshot; 
     Vectorq7x1 qdot_max_vec; // velocity constraint on each joint for interpolation
+    sensor_msgs::JointState joint_states_; // copy from robot/joint_states subscription
     baxter_core_msgs::JointCommand right_cmd_,left_cmd_;  // define instances of these message types, to control arms    
     cwru_srv::simple_bool_service_message traj_status_srv_;
     
