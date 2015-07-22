@@ -204,6 +204,21 @@
           </packing>
         </child>
         <child>
+          <object class="GtkButton" id="preview_move">
+            <property name="label" translatable="yes">preview move</property>
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="receives_default">True</property>
+            <property name="use_action_appearance">False</property>
+            <signal name="clicked" handler="preview_move_cb" swapped="no"/>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">13</property>
+          </packing>
+        </child>
+        <child>
           <object class="GtkButton" id="execute_move">
             <property name="label" translatable="yes">execute planned move</property>
             <property name="visible">True</property>
@@ -215,7 +230,7 @@
           <packing>
             <property name="expand">True</property>
             <property name="fill">True</property>
-            <property name="position">13</property>
+            <property name="position">14</property>
           </packing>
         </child>
       </object>

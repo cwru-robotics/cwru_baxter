@@ -116,6 +116,12 @@ G_MODULE_EXPORT void plan_move_to_IM_cb(GtkButton *plan_move_to_IM, gpointer dat
   system("rosservice call coordinator_svc 6");
 }
 
+G_MODULE_EXPORT void preview_move_cb(GtkButton *preview_move, gpointer data) 
+{
+  printf("previewing motion plan\n");
+  system("rosservice call coordinator_svc 12");
+}
+
 G_MODULE_EXPORT void execute_move_cb(GtkButton *execute_move, gpointer data) 
 {
   printf("executing motion plan\n");
