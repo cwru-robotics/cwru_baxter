@@ -131,13 +131,13 @@ G_MODULE_EXPORT void execute_move_cb(GtkButton *execute_move, gpointer data)
 G_MODULE_EXPORT void open_gripper_cb(GtkButton *open_gripper, gpointer data) 
 {
   printf("opening gripper\n");
-  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -3.5");
+  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -4.5");
 }
 
 G_MODULE_EXPORT void close_gripper_cb(GtkButton *close_gripper, gpointer data) 
 {
   printf("closing gripper\n");
-  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -4.0");
+  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -1.5");
 }
 
 
