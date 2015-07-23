@@ -1,5 +1,5 @@
 <launch>
 <!-- need camera link for Kinect driver -->
 <!-- make this tf external for tuning -->
-<node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0   0.5 0 -0.5 0.50 kinect_link camera_link 50"/>
+<node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0   8 0 0 2 kinect_link camera_link 50"/>
 </launch>
