@@ -12,3 +12,12 @@ In second terminal, run:
 In third terminal,
 `roscd simple_gui`
 `./service_call_gui`
+
+To use Yale hand, (in 4th terminal):
+`roslaunch motor_controller yale_hand.launch`
+
+If race condition, then do the above via separate launches:
+`roslaunch motor_controller controller_manager.launch`
+(wait) and
+`roslaunch motor_controller tilt_controller.launch`
+(runs to completion)
