@@ -74,10 +74,10 @@ include_directories(
  #)
 # Executables
 add_executable(pcl_perception_node2 src/pcl_perception_node2.cpp)
-
+add_executable(bed_of_nails_node src/bed_of_nails_node.cpp)
 # target_link_library(example my_lib)
 target_link_libraries(pcl_perception_node2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-
+target_link_libraries(bed_of_nails_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 cs_install()
 cs_export()
     

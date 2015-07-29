@@ -1,0 +1,16 @@
+<launch>
+
+<!--include file ="$(find baxter_gazebo)/launch/baxter_world.launch"/-->
+
+<node pkg="coordinator" type="coordinator" name="coordinator"/>
+<!--node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/-->
+<!--node pkg="pcl_perception_node" type="bed_of_nails_node" name="bed_of_nails_node"/-->
+<node pkg="rviz" type="rviz" name="rviz"/>
+<!--node pkg="simple_GUI" type="service_call_gui" name="service_call_gui"/-->
+  <!-- Publish a static transform between the world and the base of the robot -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_world" args="0 0 0 0 0 0 0 world base" />
+  <!-- wsn: transform for kinect -->
+<node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0  0 0 0 1 kinect_link camera_link 100"/>
+<node pkg="tf" type="static_transform_publisher" name="kinect_calib" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link kinect_pc_frame 100"/>
+
+</launch>
