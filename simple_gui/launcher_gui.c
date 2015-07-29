@@ -34,12 +34,14 @@ on_window_destroy (GtkObject *object, gpointer user_data)
         gtk_main_quit();
 }
 
-G_MODULE_EXPORT void enable_control_cb(GtkButton *enable_control, gpointer data) 
+//attempt to create a GUI to perform launches.  Not working out so well...
+//separate window spawns and gazebo comes up, but GUI remains grayed out
+G_MODULE_EXPORT void launch_baxter_gazebo_cb(GtkButton *launch_baxter_gazebo, gpointer data) 
 {
-  printf("enabling motor control\n");
+  printf("launching baxter gazebo; wait for ~30sec...\n");
     //system("cd ~/home/ros_ws");
-    system("rosrun baxter_tools enable_robot.py -e");
-
+    //system("gnome-terminal -e 'roslaunch cwru_baxter_sim baxter_world.launch'");
+    system("xterm -e -disown 'roslaunch cwru_baxter_sim baxter_world.launch'");
 }
 
 G_MODULE_EXPORT void enable_gripper_usb_cb(GtkButton *enable_gripper_usb, gpointer data) 
@@ -167,7 +169,7 @@ main (int argc, char *argv[])
         return( 1 );
     }
 */
-        gtk_builder_add_from_file (builder, "glade2_example.glade", NULL);
+        gtk_builder_add_from_file (builder, "launcher_gui.glade", NULL);
         /* window = GTK_WIDGET (gtk_builder_get_object (builder, "window")); */
         window = GTK_WIDGET (gtk_builder_get_object (builder, "window1"));
         gtk_builder_connect_signals (builder, NULL);          

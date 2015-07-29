@@ -1,0 +1,32 @@
+<launch>
+<!-- assume either baxter_gazebo or real baxter is running /-->
+<!-- in either case, the robot model should be loaded on the parameter server before this launch file is run -->
+<!--include file ="$(find baxter_gazebo)/launch/baxter_world.launch"/-->
+  <!-- Load the URDF into the ROS Parameter Server -->
+  <!--param name="robot_description"
+	 command="cat '$(find cwru_baxter_sim)/cwru_baxter.urdf'" /-->
+<!-- robot_state_publisher is also loaded by real baxter...so do this in gazebo launch as well -->
+<!--node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/-->
+
+<!-- here are some cwru nodes -->
+<node pkg="reachability" type="reachability_from_above_v2" name="reachability_from_above_v2"/>
+<node pkg="baxter_traj_streamer" type="traj_interpolator_as" name="traj_interpolator_as"/>
+<node pkg="cartesian_moves" type="arm_motion_interface" name="arm_motion_interface"/>
+
+<node pkg="interactive_marker_node" type="interactive_marker_node" name="interactive_marker_node"/>
+<node pkg="coordinator" type="coordinator" name="coordinator"/>
+<node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/>
+<node pkg="rviz" type="rviz" name="rviz"/>
+<!--node pkg="simple_GUI" type="service_call_gui" name="service_call_gui"/-->
+  <!-- Publish a static transform between the world and the base of the robot -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_world" args="0 0 0 0 0 0 0 world base" />
+  <!-- wsn: transform for kinect; need to load kinect model onto parameter server; need to make transforms work either with
+      gazebo or with real baxter;  thus, cannot define kinect inside of baxter.urdf -->
+<!-- need camera link for Kinect driver -->
+<!-- make this tf external for tuning -->
+<!--node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0  0 0 0 1 kinect_link camera_link 50"/-->
+<node pkg="tf" type="static_transform_publisher" name="kinect_calib" args="0 0 0 0 0 0 1 head kinect_link 50"/>
+<node pkg="tf" type="static_transform_publisher" name="kinect_sensor" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link kinect_pc_frame 50"/>
+<!--node pkg="tf" type="static_transform_publisher" name="kinect_sensor2" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link camera_depth_optical_frame 50"/-->
+<!--node pkg="tf" type="static_transform_publisher" name="kinect_sensor3" args="0 0 0 -0.500 0.500 -0.500 0.500 camera_depth_optical_frame camera_rgb_optical_frame 50"/-->
+</launch>

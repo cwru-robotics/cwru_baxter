@@ -9,13 +9,13 @@
         <property name="visible">True</property>
         <property name="can_focus">False</property>
         <child>
-          <object class="GtkButton" id="enable_control">
-            <property name="label" translatable="yes">enable robot</property>
+          <object class="GtkButton" id="launch_baxter_gazebo">
+            <property name="label" translatable="yes">launch baxter gazebo</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
             <property name="use_action_appearance">False</property>
-            <signal name="clicked" handler="enable_control_cb" swapped="no"/>
+            <signal name="clicked" handler="launch_baxter_gazebo_cb" swapped="no"/>
           </object>
           <packing>
             <property name="expand">True</property>
