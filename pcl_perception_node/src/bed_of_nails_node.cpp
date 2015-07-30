@@ -70,7 +70,7 @@ const int PCL_FIND_ON_TABLE = 5;
 const int PCL_TAKE_SNAPSHOT = 6;
 const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
 
-const int silhouette_size = 32;
+
 
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
@@ -78,11 +78,12 @@ const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
 const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
 const double H_CYLINDER = 0.24; // estimated height of cylinder
  /**/
-const double x_view_min=0.4;
+// set training window x and y range; nom x = 0.7, y = 0
+const double x_view_min=0.5;
 const double x_view_max=0.9;
 const double y_view_min=-0.2;
 const double y_view_max=0.2;
-
+const int silhouette_size = 128; //set chosen resolution for sampling "bed of nails"
 
 //typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
 
@@ -324,6 +325,7 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     int npts = indices_z_eps.size();
         Eigen::Vector3f pt;
         
+    //unnecessarily slow--could simply transform centroid of the selected points
     for (int i=0;i<npts;i++) {
         pt = g_cloud_wrt_base->points[indices_z_eps[i]].getVector3fMap();
         g_table_z_wrt_base+= pt(2);
@@ -586,14 +588,14 @@ void find_bounding_box(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &i
 
     for (int i=1;i<npts;i++) {
         pt = inputCloud->points[indices[i]].getVector3fMap();
-        ROS_INFO(" pt %d: %f, %f, %f",i,pt(0),pt(1),pt(2));
+        //ROS_INFO(" pt %d: %f, %f, %f",i,pt(0),pt(1),pt(2));
         x_min = smaller(x_min,pt(0));
         x_max = larger(x_max,pt(0));
         y_min = smaller(y_min,pt(1));
         y_max = larger(y_max,pt(1));
         z_min = smaller(z_min,pt(2));
         z_max = larger(z_max,pt(2));
-        ROS_INFO(" x_min, x_max, y_min, y_max, z_min, z_max = %f %f %f %f %f %f",x_min,x_max,y_min,y_max,z_min,z_max);
+        //ROS_INFO(" x_min, x_max, y_min, y_max, z_min, z_max = %f %f %f %f %f %f",x_min,x_max,y_min,y_max,z_min,z_max);
     }
     ROS_INFO(" x_min, x_max, y_min, y_max, z_min, z_max = %f %f %f %f %f %f",x_min,x_max,y_min,y_max,z_min,z_max);
     
@@ -605,25 +607,56 @@ void compute_depth_map_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> 
         float x_min, float x_max, float y_min, float y_max, 
         int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size]){
     float del_x,del_y;
+    int bitmap[silhouette_size][silhouette_size];
 
     for (int ix=0;ix<silhouette_size;ix++)
         for (int jy=0;jy<silhouette_size;jy++)
         {
             silhouette_z[ix][jy]=0;
             depth_z[ix][jy]=0;
+            bitmap[ix][jy]=0;
         }
     int npts = indices.size();
     Eigen::Vector3f pt;
     int ix,jy;
-    del_x = (x_max-x_min)/silhouette_size;
-    del_y = (y_max - y_min)/silhouette_size;
+    del_x = (x_view_max-x_view_min)/silhouette_size;
+    del_y = (y_view_max - y_view_min)/silhouette_size;
+    int ix_min,ix_max,jy_min,jy_max; // convert dimensions of bounding box to indices
+    ix_min = int_bin(x_view_min,del_x,x_min);
+    ix_max = int_bin(x_view_min,del_x,x_max);
+    jy_min = int_bin(y_view_min,del_y,y_min);
+    jy_max = int_bin(y_view_min,del_y,y_max);
+
     
     for (int i=0;i<npts;i++) {
         pt = inputCloud->points[indices[i]].getVector3fMap();
-        ix = int_bin(x_min,del_x,pt[0]);
-        jy = int_bin(y_min,del_y,pt[1]);
+        ix = int_bin(x_view_min,del_x,pt[0]);
+        jy = int_bin(y_view_min,del_y,pt[1]);
         silhouette_z[ix][jy]++;
+        depth_z[ix][jy]+=pt[2];
+        bitmap[ix][jy]=1;
     }
+    //compute the centroid in ix,jy coords
+    int ix_centroid=0;
+    int jy_centroid=0;
+    int n_bits_on=0;
+   for (int ix=0;ix<silhouette_size;ix++)
+        for (int jy=0;jy<silhouette_size;jy++)
+        {
+            if (silhouette_z[ix][jy]) {
+                ix_centroid+=ix;
+                jy_centroid+=jy;
+                n_bits_on++;
+                depth_z[ix][jy]/=silhouette_z[ix][jy]; // compute avg depth for each nonzero cell
+            }
+        }    
+    // these values should be useful--should return them
+    ix_centroid/=n_bits_on;
+    jy_centroid/=n_bits_on;
+    ROS_INFO("centroid ix,jy = %d, %d",ix_centroid,jy_centroid);
+    ROS_INFO("bits on = %d",n_bits_on);
+    ROS_INFO("indices of bounding box: xmin, xmax, ymin, ymax = %d, %d, %d, %d",
+            ix_min,ix_max,jy_min,jy_max);
 }
 
 
@@ -915,7 +948,7 @@ int main(int argc, char** argv) {
                 case PCL_FIND_PNTS_ABOVE_PLANE:
                     ROS_INFO("filtering for points above identified plane");
                     // w/ affine transform, z-coord of points on plane (in plane frame) should be ~0
-                    z_threshold = 0.0+Z_EPS; //g_plane_params[3] + Z_EPS;
+                    z_threshold = 0.0+Z_EPS+g_table_z_wrt_base; //g_plane_params[3] + Z_EPS;
                     ROS_INFO("filtering for points above %f ", z_threshold);
 
                     //filter_cloud_above_z(g_cloud_transformed, z_threshold, indices_pts_above_plane);
@@ -936,6 +969,8 @@ int main(int argc, char** argv) {
                     compute_depth_map_z(g_cloud_wrt_base, indices_pts_above_plane,x_min,x_max,y_min,y_max,
                         silhouette_z, depth_z); 
                     display_silhouette_z(silhouette_z);
+                    ROS_INFO("bounds: x_min, x_max, y_min, y_max = %f, %f %f, %f",x_min,x_max,y_min,y_max);
+                    //
                     break;
                 case PCL_COMPUTE_CYLINDRICAL_FIT_ERR_INIT:
                     //double cx,cy;
