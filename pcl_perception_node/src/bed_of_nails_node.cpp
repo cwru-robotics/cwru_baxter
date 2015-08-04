@@ -79,7 +79,7 @@ const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a 
 const double H_CYLINDER = 0.24; // estimated height of cylinder
  /**/
 // set training window x and y range; nom x = 0.7, y = 0
-const double x_view_min=0.5;
+const double x_view_min=0.35; //0.3 picks up some of e-stop box
 const double x_view_max=0.9;
 const double y_view_min=-0.2;
 const double y_view_max=0.2;
@@ -205,7 +205,7 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
     ROS_INFO("PROCESSING THE PATCH: ");
     int npts = g_pclSelect->width * g_pclSelect->height;
     cout<<"frame_id of g_pclSelect: "<<g_pclSelect->header.frame_id<<endl;
-    cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame)");
+    cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame or camera_rgb_optical_frame)");
     centroidEvec3f = computeCentroid(g_pclSelect); // compute the centroid of this point cloud (selected patch)
 
     std::vector<float> rsqd_vec;
@@ -271,9 +271,11 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     NormalEstimation<PointXYZ, Normal> n; // object to compute the normal to a set of points 
 
    //Eigen::Vector3f plane_normal;
+    // plane normal, in sensor-frame coords 
     Eigen::Vector3f x_dir;
     for (int i = 0; i < 3; i++) g_plane_normal[i] = plane_params[i]; //for selected patch, get plane normal from point-cloud processing result
 
+    // construct a frame w/rt planar patch, expressed in sensor coords
     x_dir << 1, 0, 0; // keep x-axis the same...nominally
     x_dir = x_dir - g_plane_normal * (g_plane_normal.dot(x_dir)); // force x-dir to be orthogonal to z-dir
     x_dir /= x_dir.norm(); // want this to be unit length as well
@@ -284,9 +286,9 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     // let's define an origin on this plane as well.  The patch centroid should do
     g_plane_origin = g_patch_centroid;
     // nope...try using base-frame origin:
-    g_base_origin(0)=0.0;
-    g_base_origin(1)=0.0;
-    g_base_origin(2)=g_patch_centroid(2); //0.0; //set z height of this frame equal to elevation of planar surface
+    //g_base_origin(0)=0.0;
+    //g_base_origin(1)=0.0;
+    //g_base_origin(2)=g_patch_centroid(2); //0.0; //set z height of this frame equal to elevation of planar surface
     
     
     // define the transform s.t. A*pt_wrt_plane coords = pt_wrt_sensor_coords
@@ -297,18 +299,50 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     cout<<"Orientation from plane: "<<endl;
     cout<<g_R_transform<<endl;
     
+    // test: transform the selected points into new plane frame:
+    Eigen::Vector3f selected_pt;
+    
+    transform_cloud(g_pclSelect, g_A_plane.inverse(), g_cloud_transformed); // transform the point cloud selection
+    /*
+    int npts_selected = g_cloud_transformed->width * g_cloud_transformed->height;
+    cout<<"transformed "<<npts_selected<<" points from selection"<<endl;
+    for (int i = 0; i < npts_selected; ++i) {
+        selected_pt = g_cloud_transformed->points[i].getVector3fMap();
+        cout<<selected_pt.transpose()<<endl;
+    }        
+    */
     // use the following to transform kinect points into the plane frame; could do translation as well, but not done here
     //Eigen::Matrix3f R_transpose = g_R_transform.transpose();
 
-    g_z_plane_nom = plane_params[3]; // distance of plane from sensor origin--same as distance measured along plane normal--so should be negative
-    cout<<"nom plane dist from sensor origin: "<<g_z_plane_nom<<endl;
+    g_z_plane_nom = 0.0; //plane_params[3]; // distance of plane from sensor origin--same as distance measured along plane normal--so should be negative
+    //cout<<"nom plane dist from sensor origin: "<<g_z_plane_nom<<endl;
+    
     // after rotating the points to align with the plane of the selected patch, all z-values should be approximately the same,
     // = z_plane_nom
     double z_eps = Z_EPS; // choose a tolerance for plane inclusion +/- z; 1cm??
 
+    //int npts_pclKinect = g_pclKinect->width * g_pclKinect->height;
+    // cout<<"npts_pclKinect = "<<npts_pclKinect<<endl;
+   
     //transform the ENTIRE point cloud:
     //transform_cloud(g_pclKinect, R_transpose, g_cloud_transformed); // rotate the entire point cloud
-    transform_cloud(g_pclKinect, g_A_plane.inverse(), g_cloud_transformed); // transform the entire point cloud    
+    transform_cloud(g_pclKinect, g_A_plane.inverse(), g_cloud_transformed); // transform the entire point cloud   
+    //test test test...look for points near z=0
+    //int npts_transformed = g_pclKinect->width * g_pclKinect->height;
+    //cout<<"npts_transformed = "<<npts_transformed<<endl;
+            
+    //int ans;
+    //cout<<"transformed "<<npts_transformed<<" points from selection"<<endl;
+    /*
+    for (int i = 0; i < npts_transformed; ++i) {
+        selected_pt = g_cloud_transformed->points[i].getVector3fMap();
+        cout<<selected_pt.transpose()<<endl;
+        if (fabs(selected_pt[2])<z_eps) {
+            cout<<"found a point on selected plane...enter 1:";
+            cin>>ans;
+        }
+    }    
+     * */        
     // g_cloud_transformed is now expressed in the frame of the selected plane;
     // let's extract all of the points (i.e., name the indices of these points) for which the z value corresponds to the chosen plane,
     // within tolerance z_eps
@@ -700,8 +734,8 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
             canCloud->points[i].getVector3fMap() = pt;
             i++;
         }
-
-    canCloud->header.frame_id = "kinect_pc_frame"; //base"; //vs /base_link?
+    // use camera_rgb_optical_frame for physical Kinect
+    canCloud->header.frame_id = "camera_rgb_optical_frame"; //kinect_pc_frame"; //base"; //vs /base_link?
     //canCloud->header.stamp = ros::Time::now();
     canCloud->is_dense = true;
     canCloud->width = npts;
@@ -802,7 +836,7 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
     poseStamped.pose.position.y = origin[1];
     poseStamped.pose.position.z = origin[2]; 
     poseStamped.header.stamp = ros::Time().now();
-    poseStamped.header.frame_id = "kinect_pc_frame";
+    poseStamped.header.frame_id = "camera_rgb_optical_frame"; // had to change topic for physical kinect; kinect_pc_frame";
     // need to convert this frame to a poseStamped and put into response
     response.poseStamped_IM_current = poseStamped;
 }
@@ -860,7 +894,10 @@ int main(int argc, char** argv) {
                 //try to lookup transform from target frame "base" to source frame "kinect_pc_frame"
             //The direction of the transform returned will be from the target_frame to the source_frame. 
              //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-                tfListener.lookupTransform("kinect_pc_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
+             // this version for physical Kinect
+                tfListener.lookupTransform("camera_rgb_optical_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
+
+                //tfListener.lookupTransform("kinect_pc_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
             } catch(tf::TransformException &exception) {
                 ROS_ERROR("%s", exception.what());
                 tferr=true;
@@ -878,7 +915,8 @@ int main(int argc, char** argv) {
     cout<<"subscribing to kinect depth points"<<endl;    
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
-    ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
+    ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/camera/depth_registered/points", 1, kinectCB);
+    //ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
     
     cout<<"subscribing to selected points"<<endl;  
     
