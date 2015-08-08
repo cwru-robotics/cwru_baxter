@@ -143,7 +143,8 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
     ROS_INFO("PROCESSING THE PATCH: ");
     int npts = g_pclSelect->width * g_pclSelect->height;
     cout<<"frame_id of g_pclSelect: "<<g_pclSelect->header.frame_id<<endl;
-    cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame)");
+    cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame or camera_rgb_optical_frame)");
+    g_pclSelect->header.frame_id = "camera_rgb_optical_frame"; // frame associated w/ Kinect on Baxter
     centroidEvec3f = computeCentroid(g_pclSelect); // compute the centroid of this point cloud (selected patch)
 
     std::vector<float> rsqd_vec;
