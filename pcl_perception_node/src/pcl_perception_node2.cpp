@@ -459,8 +459,9 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
             canCloud->points[i].getVector3fMap() = pt;
             i++;
         }
+    //canCloud->header.frame_id = "kinect_pc_frame"; //base"; //vs /base_link?
 
-    canCloud->header.frame_id = "kinect_pc_frame"; //base"; //vs /base_link?
+    canCloud->header.frame_id = "camera_depth_optical_frame"; //base"; //vs /base_link?
     //canCloud->header.stamp = ros::Time::now();
     canCloud->is_dense = true;
     canCloud->width = npts;
@@ -561,7 +562,8 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
     poseStamped.pose.position.y = origin[1];
     poseStamped.pose.position.z = origin[2]; 
     poseStamped.header.stamp = ros::Time().now();
-    poseStamped.header.frame_id = "kinect_pc_frame";
+    //poseStamped.header.frame_id = "kinect_pc_frame";
+    poseStamped.header.frame_id = "camera_depth_optical_frame";
     // need to convert this frame to a poseStamped and put into response
     response.poseStamped_IM_current = poseStamped;
 }
