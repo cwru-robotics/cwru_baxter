@@ -15,27 +15,14 @@
 
 <node pkg="interactive_marker_node" type="interactive_marker_node" name="interactive_marker_node"/>
 <node pkg="coordinator" type="coordinator" name="coordinator"/>
-<node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/>
+<!--node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/-->
+<node pkg="pcl_perception_node" type="bed_of_nails_node" name="bed_of_nails_node"/>
 
 <!-- tool transform publisher -->
-<node pkg="tf" type="static_transform_publisher" name="tool_xform" args="-0.030 0 0.120 0 0 0 1 right_hand gripper_frame 20"/>
+<include file ="$(find cwru_baxter_launch)/yale_gripper_xform.launch"/>
+<!-- set height from floor to Baxter base: -->
+<!--include file ="$(find cwru_baxter_launch)/floor_base_xform.launch"/-->
+<!-- publish Kinect transforms: -->
+<include file ="$(find cwru_baxter_launch)/kinect_transform.launch"/>
 
-<!--run rviz separately/manually -->
-<!--node pkg="rviz" type="rviz" name="rviz"/-->
-<!--node pkg="simple_GUI" type="service_call_gui" name="service_call_gui"/-->
-  <!-- Publish a static transform between the world and the base of the robot -->
-  <!--node pkg="tf2_ros" type="static_transform_publisher" name="base_to_world" args="0 0 0 0 0 0 0 world base" /-->
-
-<!-- moved camera transforms to separate launch file -->
-  <!-- wsn: transform for kinect; need to load kinect model onto parameter server; need to make transforms work either with
-      gazebo or with real baxter;  thus, cannot define kinect inside of baxter.urdf -->
-<!-- need camera link for Kinect driver -->
-<!-- make this tf external for tuning; moved these to: kinect_transform.launch -->
-<!--node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0  0 0 0 1 kinect_link camera_link 50"/-->
-<!--node pkg="tf" type="static_transform_publisher" name="kinect_calib" args="0 0 0 0 0 0 1 head kinect_link 50"/-->
-<!--node pkg="tf2_ros" type="static_transform_publisher" name="kinect_sensor" args="0.31 -0.032 1 1.224 0.055 -0.81 -0.022 kinect_link kinect_pc_frame 50"/-->
-
-<!--node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0.31 -0.032 1 1.224 0.055 -0.81 -0.022 kinect_link camera_link 50"/-->
-<!--node pkg="tf" type="static_transform_publisher" name="kinect_sensor2" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link camera_depth_optical_frame 50"/-->
-<!--node pkg="tf" type="static_transform_publisher" name="kinect_sensor3" args="0 0 0 -0.500 0.500 -0.500 0.500 camera_depth_optical_frame camera_rgb_optical_frame 50"/-->
 </launch>

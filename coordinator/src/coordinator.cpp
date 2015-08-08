@@ -224,16 +224,16 @@ int main(int argc, char **argv) {
     
     tf::StampedTransform tf_kinect_wrt_torso;
     // wait to start receiving valid tf transforms 
-    /*
+    /**/
     bool tferr = true;
-    ROS_INFO("waiting for tf between kinect and torso...");
+    ROS_INFO("waiting for tf between kinect: camera_depth_optical_frame and torso...");
     while (tferr) {
         tferr = false;
         try {
 
             //The direction of the transform returned will be from the target_frame to the source_frame. 
             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-            tfListener.lookupTransform("kinect_pc_frame", "torso", ros::Time(0), tf_kinect_wrt_torso);
+            tfListener.lookupTransform("camera_depth_optical_frame", "torso", ros::Time(0), tf_kinect_wrt_torso);
         } catch (tf::TransformException &exception) {
             ROS_ERROR("%s", exception.what());
             tferr = true;
@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
         }
     }
     ROS_INFO("tf is good");
-*/
+
     //communicate with node interactive_marker_node interactive_marker_node
     ROS_INFO("setting up a service client of rt_hand_marker");
     ros::ServiceClient IM_6dof_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("IM6DofSvc");

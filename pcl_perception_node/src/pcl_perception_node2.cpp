@@ -62,8 +62,12 @@ const int PCL_TAKE_SNAPSHOT = 6;
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
 
-const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
-const double H_CYLINDER = 0.24; // estimated height of cylinder
+//const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
+//const double H_CYLINDER = 0.24; // estimated height of cylinder
+
+//fit to coke can from Kinect view
+const double R_CYLINDER = 0.03; //estimated from ruler tool...example to fit a cylinder of this radius to data
+const double H_CYLINDER = 0.12; // estimated height of cylinder
  /**/
 
 //typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
@@ -567,6 +571,7 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
     poseStamped.header.frame_id = "camera_depth_optical_frame";
     // need to convert this frame to a poseStamped and put into response
     response.poseStamped_IM_current = poseStamped;
+    return true;
 }
 
 // this callback wakes up when a new "selected Points" message arrives
@@ -616,7 +621,7 @@ int main(int argc, char** argv) {
     cout<<"subscribing to kinect depth points"<<endl;    
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
-    ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
+    ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/camera/depth/points", 1, kinectCB);
     
     cout<<"subscribing to selected points"<<endl;  
     

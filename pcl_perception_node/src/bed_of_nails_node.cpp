@@ -75,8 +75,12 @@ const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
 
-const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
-const double H_CYLINDER = 0.24; // estimated height of cylinder
+//const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
+//const double H_CYLINDER = 0.24; // estimated height of cylinder
+
+//fit to coke can from Kinect view
+const double R_CYLINDER = 0.03; //estimated from ruler tool...example to fit a cylinder of this radius to data
+const double H_CYLINDER = 0.12; // estimated height of cylinder
  /**/
 // set training window x and y range; nom x = 0.7, y = 0
 const double x_view_min=0.35; //0.3 picks up some of e-stop box
@@ -204,8 +208,12 @@ void display_pts(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud, std::vector<int>isele
 void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector4f &plane_params) {
     ROS_INFO("PROCESSING THE PATCH: ");
     int npts = g_pclSelect->width * g_pclSelect->height;
-    cout<<"frame_id of g_pclSelect: "<<g_pclSelect->header.frame_id<<endl;
-    cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame or camera_rgb_optical_frame)");
+    if (npts<1) {
+        ROS_WARN("received patch has no points!!!");
+        return;
+    }
+    //ROS_INFO("frame_id of g_pclSelect: %s\n",g_pclSelect->header.frame_id.c_str());
+    //cout<<("(this seems to be a lie; presumably this is actually kinect_pc_frame or camera_rgb_optical_frame)");
     centroidEvec3f = computeCentroid(g_pclSelect); // compute the centroid of this point cloud (selected patch)
 
     std::vector<float> rsqd_vec;
@@ -216,8 +224,9 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
         variance += rsqd_vec[i];
         //cout<<rsqd_vec[i]<<", ";      
     }
-    cout << endl;
-    variance /= ((float) npts);
+    //cout << endl;
+    if (npts>0)
+        variance /= ((float) npts);
       
     // now, eliminate any outliers; actually, keep only points withing 1 std;
     for (int i = 0; i < npts; i++) {
@@ -225,12 +234,14 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
             iselect_filtered.push_back(i); // choosey: retain only points within 1 std dev
         }
     }
-    cout << "npts = " << npts << endl;
-    cout << "npts of filtered patch: " << iselect_filtered.size() << endl;
-    cout << "variance = " << variance << endl;
-    cout << "std_dev: " << sqrt(variance) << endl;
+    ROS_INFO("computing centroid \n");
+   ROS_INFO("npts = %d",npts);
+   int npts_filtered = iselect_filtered.size();
+    ROS_INFO("npts of filtered patch: %d \n",npts_filtered );
+    //cout << "variance = " << variance << endl;
+    //cout << "std_dev: " << sqrt(variance) << endl;
     centroidEvec3f = computeCentroid(g_pclSelect, iselect_filtered);
-    cout << "refined centroid:    " << centroidEvec3f.transpose() << endl;
+    ROS_INFO("refined centroid:   %f, %f, %f \n", centroidEvec3f(0),centroidEvec3f(1),centroidEvec3f(2));
 
     // next line causes a core dump, if compile w/ C++11 !!
     //  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
@@ -245,7 +256,7 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
         for (int i=0;i<4;i++)
             plane_params[i]*= -1.0;
     }
-    std::cout << "plane_params, filtered patch: " << plane_params.transpose() << std::endl;
+    ROS_INFO("plane_params, filtered patch: %f, %f, %f, %f \n", plane_params(0),plane_params(1),plane_params(2),plane_params(3));
     /*
     std::cout<< "here are z-values of preserved points: "<<endl;
     int j;
@@ -256,6 +267,7 @@ void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroid
         cout<<sel_pt.transpose()<<endl;
     }
     */
+    ROS_INFO("done processing patch\n");
 }
 
 
@@ -303,14 +315,14 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     Eigen::Vector3f selected_pt;
     
     transform_cloud(g_pclSelect, g_A_plane.inverse(), g_cloud_transformed); // transform the point cloud selection
-    /*
+    
     int npts_selected = g_cloud_transformed->width * g_cloud_transformed->height;
     cout<<"transformed "<<npts_selected<<" points from selection"<<endl;
     for (int i = 0; i < npts_selected; ++i) {
         selected_pt = g_cloud_transformed->points[i].getVector3fMap();
         cout<<selected_pt.transpose()<<endl;
     }        
-    */
+    
     // use the following to transform kinect points into the plane frame; could do translation as well, but not done here
     //Eigen::Matrix3f R_transpose = g_R_transform.transpose();
 
@@ -717,7 +729,7 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
     double theta,h;
     Eigen::Vector3f pt;
     int npts=0;
-    ROS_INFO("making can cloud");
+    //ROS_INFO("making can cloud");
     //count the points:
     for (theta=0;theta<2.0*M_PI;theta+=0.3)
         for (h=0;h<h_can;h+= 0.01)  
@@ -742,7 +754,7 @@ void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, doubl
     canCloud->height = 1;
 
     copy_cloud(canCloud,g_canCloud);
-    ROS_INFO("done making/copying canCloud");
+    //ROS_INFO("done making/copying canCloud");
     //optionally, rotate the cylinder to make its axis parallel to the most recently defined normal axis
     //transform_cloud(g_canCloud, g_R_transform, canCloud);    
 }
@@ -839,6 +851,7 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
     poseStamped.header.frame_id = "camera_rgb_optical_frame"; // had to change topic for physical kinect; kinect_pc_frame";
     // need to convert this frame to a poseStamped and put into response
     response.poseStamped_IM_current = poseStamped;
+    return true;
 }
 
 // this callback wakes up when a new "selected Points" message arrives
