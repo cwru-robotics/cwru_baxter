@@ -223,7 +223,8 @@ int main(int argc, char **argv) {
     g_tfListener_ptr = &tfListener;
     
     tf::StampedTransform tf_kinect_wrt_torso;
-    // wait to start receiving valid tf transforms between map and odom:
+    // wait to start receiving valid tf transforms 
+    /*
     bool tferr = true;
     ROS_INFO("waiting for tf between kinect and torso...");
     while (tferr) {
@@ -241,7 +242,7 @@ int main(int argc, char **argv) {
         }
     }
     ROS_INFO("tf is good");
-
+*/
     //communicate with node interactive_marker_node interactive_marker_node
     ROS_INFO("setting up a service client of rt_hand_marker");
     ros::ServiceClient IM_6dof_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("IM6DofSvc");
