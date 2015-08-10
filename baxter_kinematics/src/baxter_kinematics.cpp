@@ -97,16 +97,78 @@ Baxter_fwd_solver::Baxter_fwd_solver() { //(const hand_s& hs, const atlas_frame&
     A_torso_to_rarm_mount(0,1) = -sin(theta_z_arm_mount);  
     A_torso_to_rarm_mount(1,0) = -A_torso_to_rarm_mount(0,1); 
     Affine_torso_to_rarm_mount = A_torso_to_rarm_mount;
+    
+    Eigen::Matrix3d R_hand;
+    Eigen::Vector3d O_hand;
+
+    O_hand(0) = Lx_hand;
+    O_hand(1) = 0.0;
+    O_hand(2) = Lz_hand;
+    
+    R_hand(0, 0) = cos(theta_yaw_hand);
+    R_hand(0, 1) = -sin(theta_yaw_hand); //% - sin(q(i))*cos(alpha);
+    R_hand(0, 2) = 0.0; //
+    R_hand(1, 0) = -R_hand(0, 1);
+    R_hand(1, 1) = R_hand(0, 0); //
+    R_hand(1, 2) = 0.0; //%
+    R_hand(2,0) = 0.0;
+    R_hand(2,1) = 0.0;
+    R_hand(2,2) = 1.0;
+       
+    // set values for the tool transform, from flange to tool frame  
+    //A_tool_to_flange_ = ...;
+    A_tool_wrt_flange_.linear() = R_hand;
+    A_tool_wrt_flange_.translation() = O_hand;
 }
 
-Eigen::Affine3d Baxter_fwd_solver::fwd_kin_solve(const Vectorq7x1& q_vec) {
+
+    // these fncs also include transform from flange to tool frame
+//    Eigen::Affine3d fwd_kin_tool_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin of tool w/rt right-arm mount 
+//    Eigen::Affine3d fwd_kin_tool_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
+//    Eigen::Affine3d fwd_kin_tool_wrt_torso_solve(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame) 
+
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_tool_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec) {
+    Eigen::Affine3d A_flange_wrt_r_arm_mount;
+    Eigen::Affine3d A_tool_wrt_r_arm_mount;
+    A_flange_wrt_r_arm_mount = fwd_kin_flange_wrt_r_arm_mount_solve(q_vec);
+    A_tool_wrt_r_arm_mount = A_flange_wrt_r_arm_mount*A_tool_wrt_flange_;
+    return A_tool_wrt_r_arm_mount;
+}
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_tool_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec) {
+    Eigen::Affine3d A_flange_wrt_r_arm_mount;
+    Eigen::Affine3d A_tool_wrt_r_arm_mount;
+    A_flange_wrt_r_arm_mount = fwd_kin_flange_wrt_r_arm_mount_solve_approx(q_vec);
+    A_tool_wrt_r_arm_mount = A_flange_wrt_r_arm_mount*A_tool_wrt_flange_;
+    return A_tool_wrt_r_arm_mount;
+}
+
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_tool_wrt_torso_solve(const Vectorq7x1& q_vec) {
+    Eigen::Affine3d A_flange_wrt_torso;
+    Eigen::Affine3d A_tool_wrt_torso;
+    A_flange_wrt_torso = fwd_kin_flange_wrt_torso_solve(q_vec);
+    A_tool_wrt_torso = A_flange_wrt_torso*A_tool_wrt_flange_;
+    return A_tool_wrt_torso;
+}
+
+
+//    Eigen::Affine3d fwd_kin_flange_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin
+//    Eigen::Affine3d fwd_kin_flange_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
+//    Eigen::Affine3d fwd_kin_flange_wrt_torso_solve(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame)
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec) {
     Eigen::Matrix4d M;
     M = fwd_kin_solve_(q_vec);
     Eigen::Affine3d A(M);
     return A;
 }
 
-Eigen::Affine3d Baxter_fwd_solver::fwd_kin_solve_wrt_torso(const Vectorq7x1& q_vec) {
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec) {
+    Eigen::Matrix4d M;
+    M = fwd_kin_solve_approx_(q_vec);
+    Eigen::Affine3d A(M);
+    return A;
+}
+
+Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_torso_solve(const Vectorq7x1& q_vec) {
     Eigen::Matrix4d M;
     M = fwd_kin_solve_(q_vec);
     M = A_torso_to_rarm_mount*M;
@@ -114,12 +176,7 @@ Eigen::Affine3d Baxter_fwd_solver::fwd_kin_solve_wrt_torso(const Vectorq7x1& q_v
     return A;
 }
 
-Eigen::Affine3d Baxter_fwd_solver::fwd_kin_solve_approx(const Vectorq7x1& q_vec) {
-    Eigen::Matrix4d M;
-    M = fwd_kin_solve_approx_(q_vec);
-    Eigen::Affine3d A(M);
-    return A;
-}
+
 
 Eigen::Matrix4d Baxter_fwd_solver::get_wrist_frame() {
     return A_mat_products[5]; // frames 4 and 5 have coincident origins
@@ -270,8 +327,8 @@ Eigen::Affine3d Baxter_fwd_solver::transform_affine_from_torso_frame_to_arm_moun
     return Affine_torso_to_rarm_mount.inverse()*pose_wrt_torso;
 }
 
+//inner fwd-kin fnc: computes tool-flange frame w/rt right_arm_mount frame
 //return soln out to tool flange; would still need to account for tool transform for gripper
-
 //TESTED RIGHT-ARM FWD KIN on 5/27; LOOKS GOOD RELATIVE TO TF (w/rt right_arm_mount frame)
 Eigen::Matrix4d Baxter_fwd_solver::fwd_kin_solve_(const Vectorq7x1& q_vec) {
     Eigen::Matrix4d A = Eigen::Matrix4d::Identity();
@@ -408,7 +465,7 @@ Eigen::Vector3d Baxter_IK_solver::wrist_pt_wrt_frame1_of_flange_des_and_qs0(Eige
     //next line is somewhat wasteful; computes fwd kin just to get A_shoulder_wrt_arm_mount
     //although all 7 frames are computed, only the first is used/needed;
     //only requires specification of q0;  q1 through q6 can be arbitrary
-    Eigen::Affine3d A_fwd_DH_approx = fwd_kin_solve_approx(q_vec);
+    Eigen::Affine3d A_fwd_DH_approx = fwd_kin_flange_wrt_r_arm_mount_solve_approx(q_vec);
     
     //cout<<"A_fwd_DH_approx.linear(): "<<endl;
     //cout<<A_fwd_DH_approx.linear()<<endl;
@@ -629,6 +686,7 @@ int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_
 
 
 // assumes desired_hand_pose is w/rt D-H frame 0;
+// actually..."desire_hand_pose"  is a flange pose...does not account for Yale hand offset and rotation
 // use ik_solve_approx_wrt_torso if hand frame is expressed w/rt torso
 //major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
 // for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
@@ -643,7 +701,12 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
   int nsolns=0;
   q_solns.clear(); // fill in all valid solns in this list
   q_solns_123.clear();  
-  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_hand_pose);
+  Eigen::Affine3d desired_flange_pose;
+  
+  desired_flange_pose = A_tool_wrt_flange_.inverse()*desired_hand_pose;
+  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_flange_pose);
+
+  //Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_hand_pose);
   Eigen::Affine3d A_fwd_DH;  
   Eigen::Matrix4d A_wrist;
   Eigen::Matrix3d Rdes = desired_hand_pose.linear();

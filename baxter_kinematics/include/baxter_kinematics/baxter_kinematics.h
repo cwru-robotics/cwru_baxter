@@ -51,6 +51,11 @@ DH=[
 // such that arms are at 45deg from forward (making a 90-deg angle w/rt each other)
 // and elbow offsets are BELOW humerus axes
 
+//TOOL TRANSFORM params, right hand
+const double Lx_hand = 0.03;
+const double Lz_hand = 0.1;
+const double theta_yaw_hand= 0.2;
+
 // these values for RIGHT ARM
 const double DH_a1=0.069;
 const double DH_a2=0.0;
@@ -151,10 +156,17 @@ class Baxter_fwd_solver {
 public:
     Baxter_fwd_solver(); //constructor
     
-    // these functions are for RIGHT ARM ONLY
-    Eigen::Affine3d fwd_kin_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin
-    Eigen::Affine3d fwd_kin_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
-    Eigen::Affine3d fwd_kin_solve_wrt_torso(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame)
+    // these functions are for RIGHT ARM ONLY; tool-flange coords, w/rt right-arm mount (default) or w/rt torso (as noted)
+    Eigen::Affine3d fwd_kin_flange_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin
+    Eigen::Affine3d fwd_kin_flange_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
+    Eigen::Affine3d fwd_kin_flange_wrt_torso_solve(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame)
+
+    // these fncs also include transform from flange to tool frame
+    Eigen::Affine3d fwd_kin_tool_wrt_r_arm_mount_solve(const Vectorq7x1& q_vec); // given vector of q angles, compute fwd kin of tool w/rt right-arm mount 
+    Eigen::Affine3d fwd_kin_tool_wrt_r_arm_mount_solve_approx(const Vectorq7x1& q_vec);//version w/ spherical-wrist approx
+    Eigen::Affine3d fwd_kin_tool_wrt_torso_solve(const Vectorq7x1& q_vec); //rtns pose w/rt torso frame (base frame)    
+    
+    // these are all w/rt right-arm mount, not torso
     Eigen::Matrix4d get_wrist_frame();
     Eigen::Matrix4d get_shoulder_frame();
     Eigen::Matrix4d get_elbow_frame();
@@ -166,13 +178,19 @@ public:
     Eigen::Matrix4d get_flange_frame_approx();
     Eigen::Matrix3d get_wrist_Jacobian_3x3(double q_s1, double q_humerus, double q_elbow, double q_forearm); //3x3 J for wrist point coords
     Eigen::Vector3d get_wrist_coords_wrt_frame1(const Vectorq7x1& q_vec); //fwd kin from frame 1 to wrist pt
+    
+    //this fnc casts an affine matrix w/rt torso frame into an affine matrix w/rt right-arm mount frame, so can use fncs above
     Eigen::Affine3d transform_affine_from_torso_frame_to_arm_mount_frame(Eigen::Affine3d pose_wrt_torso);    
     //CREATE CORRESPONDING FUNCTIONS FOR LEFT ARM...
     
 //private: do not make these private, so IK can access them
     // these member vars are for RIGHT ARM
+//inner fwd-kin fnc: computes tool-flange frame w/rt right_arm_mount frame
+//return soln out to tool flange; would still need to account for tool transform for gripper    
     Eigen::Matrix4d fwd_kin_solve_(const Vectorq7x1& q_vec);
+// same as above, but w/ spherical wrist approx
     Eigen::Matrix4d fwd_kin_solve_approx_(const Vectorq7x1& q_vec);  
+    
     Eigen::Matrix4d A_mats[7], A_mat_products[7], A_tool; // note: tool A must also handle diff DH vs URDF frame-7 xform
     Eigen::Matrix4d A_mats_approx[7], A_mat_products_approx[7];
     Eigen::Matrix4d A_rarm_mount_to_r_lower_forearm;
@@ -180,6 +198,10 @@ public:
     Eigen::Matrix4d A_torso_to_rarm_mount;    
     Eigen::Affine3d Affine_torso_to_rarm_mount;
     Eigen::MatrixXd Jacobian;
+     
+    Eigen::Affine3d A_tool_wrt_flange_;
+
+    //A_tool_to_flange_
     // CREATE CORRESPONDING FUNCTIONS FOR LEFT ARM...
 };
 
@@ -189,7 +211,7 @@ public:
     Baxter_IK_solver(); //constructor; 
 
     // return the number of valid solutions; actual vector of solutions will require an accessor function
-    int ik_solve(Eigen::Affine3d const& desired_hand_pose); // given vector of q angles, compute fwd kin
+    int ik_solve(Eigen::Affine3d const& desired_hand_pose); // 
     void get_solns(std::vector<Vectorq7x1> &q_solns);
     bool fit_joints_to_range(Vectorq7x1 &qvec);
     Eigen::Vector3d wrist_frame0_from_tool_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame);    
