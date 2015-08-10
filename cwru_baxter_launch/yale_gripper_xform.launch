@@ -1,0 +1,4 @@
+<launch>
+<!-- gripper z axis is parallel to flange normal; gripper x axis is along line between opposite fingertips -->
+<node pkg="tf" type="static_transform_publisher" name="tool_xform" args="-0.030 0 0.120  -0.2 0 0   right_hand yale_gripper_frame 20"/>
+</launch>
