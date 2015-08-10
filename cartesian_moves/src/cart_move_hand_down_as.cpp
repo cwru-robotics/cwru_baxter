@@ -118,22 +118,22 @@ void jointStatesCb(const sensor_msgs::JointState& js_msg) {
     
 }    
 
-//specify start and end poses w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
-bool cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path) {
+//specify start and end poses of right-arm flange w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
+bool cartesian_path_planner(Eigen::Affine3d a_flange_start,Eigen::Affine3d a_flange_end, std::vector<Eigen::VectorXd> &optimal_path) {
     std::vector<std::vector<Eigen::VectorXd> > path_options;
     path_options.clear();
     std::vector<Eigen::VectorXd> single_layer_nodes;
     Eigen::VectorXd node;
-    Eigen::Affine3d a_tool_des;
-    Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_des.linear() = R_des;
+    Eigen::Affine3d a_flange_des;
+    Eigen::Matrix3d R_des = a_flange_end.linear();
+    a_flange_des.linear() = R_des;
 
     int nsolns;
     bool reachable_proposition;
     int nsteps = 0;
     Eigen::Vector3d p_des,dp_vec,del_p,p_start,p_end;
-    p_start = a_tool_start.translation();
-    p_end = a_tool_end.translation();
+    p_start = a_flange_start.translation();
+    p_end = a_flange_end.translation();
     del_p = p_end-p_start;
     double dp_scaler = 0.05;
     nsteps = round(del_p.norm()/dp_scaler);
@@ -147,9 +147,9 @@ bool cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_
 
     for (int istep=0;istep<nsteps;istep++) 
     {
-            a_tool_des.translation() = p_des;
+            a_flange_des.translation() = p_des;
             cout<<"trying: "<<p_des.transpose()<<endl;
-            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_tool_des, q_solns);
+            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_flange_des, q_solns);
             std::cout<<"nsolns = "<<nsolns<<endl;
             single_layer_nodes.clear();
             if (nsolns>0) {
@@ -200,23 +200,23 @@ bool cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_
 }
 
 // alt version: specify start as a q_vec, and goal as a Cartesian pose (w/rt torso)
-bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path) {
+bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_flange_end, std::vector<Eigen::VectorXd> &optimal_path) {
     std::vector<std::vector<Eigen::VectorXd> > path_options;
     path_options.clear();
     std::vector<Eigen::VectorXd> single_layer_nodes;
     Eigen::VectorXd node;
-    Eigen::Affine3d a_tool_des,a_tool_start;
-    Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_start = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_start);
-    a_tool_start.linear() = R_des; // override the orientation component--require point down    
-    a_tool_des.linear() = R_des;
+    Eigen::Affine3d a_flange_des,a_flange_start;
+    Eigen::Matrix3d R_des = a_flange_end.linear();
+    a_flange_start = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_start);
+    a_flange_start.linear() = R_des; // override the orientation component--require point down    
+    a_flange_des.linear() = R_des;
 
     int nsolns;
     bool reachable_proposition;
     int nsteps = 0;
     Eigen::Vector3d p_des,dp_vec,del_p,p_start,p_end;
-    p_start = a_tool_start.translation();
-    p_end = a_tool_end.translation();
+    p_start = a_flange_start.translation();
+    p_end = a_flange_end.translation();
     del_p = p_end-p_start;
     double dp_scaler = 0.05;
     nsteps = round(del_p.norm()/dp_scaler);
@@ -236,9 +236,9 @@ bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::
     for (int istep=1;istep<nsteps;istep++) 
     {
             p_des += dp_vec;
-            a_tool_des.translation() = p_des;
+            a_flange_des.translation() = p_des;
             cout<<"trying: "<<p_des.transpose()<<endl;
-            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_tool_des, q_solns);
+            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_flange_des, q_solns);
             std::cout<<"nsolns = "<<nsolns<<endl;
             single_layer_nodes.clear();
             if (nsolns>0) {
@@ -289,22 +289,22 @@ bool cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d a_tool_end, std::
 }
 
 // alt version: look up current q_vec and head to specified goal as a Cartesian pose (w/rt torso)
-bool cartesian_path_planner(Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path) {
+bool cartesian_path_planner(Eigen::Affine3d a_flange_end, std::vector<Eigen::VectorXd> &optimal_path) {
     Vectorq7x1 q_start;
     q_start = q_vec_right_arm; // populated by callback from robot joint states
     std::vector<std::vector<Eigen::VectorXd> > path_options;
     path_options.clear();
     std::vector<Eigen::VectorXd> single_layer_nodes;
     Eigen::VectorXd node;
-    Eigen::Affine3d a_tool_des,a_tool_start;
-    Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_start = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_start);
-    a_tool_start.linear() = R_des; // override the orientation component--require point down    
-    a_tool_des.linear() = R_des;
+    Eigen::Affine3d a_flange_des,a_flange_start;
+    Eigen::Matrix3d R_des = a_flange_end.linear();
+    a_flange_start = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_start);
+    a_flange_start.linear() = R_des; // override the orientation component--require point down    
+    a_flange_des.linear() = R_des;
     
     Eigen::Vector3d p_des,dp_vec,del_p,p_start,p_end;    
-    p_start = a_tool_start.translation();
-    p_end = a_tool_end.translation();    
+    p_start = a_flange_start.translation();
+    p_end = a_flange_end.translation();    
     cout<<"starting tool-flange origin: "<<p_start.transpose()<<endl;
     cout<<"goal tool-flange origin: "<<p_end.transpose()<<endl;
 
@@ -334,9 +334,9 @@ bool cartesian_path_planner(Eigen::Affine3d a_tool_end, std::vector<Eigen::Vecto
     for (int istep=1;istep<nsteps;istep++) 
     {
             p_des += dp_vec;
-            a_tool_des.translation() = p_des;
+            a_flange_des.translation() = p_des;
             cout<<"trying: "<<p_des.transpose()<<endl;
-            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_tool_des, q_solns);
+            nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(a_flange_des, q_solns);
             std::cout<<"nsolns = "<<nsolns<<endl;
             single_layer_nodes.clear();
             if (nsolns>0) {
@@ -416,6 +416,7 @@ private:
     Eigen::Vector3d n_des, t_des, b_des;
     
     Eigen::Affine3d a_tool_start_,a_tool_end_;
+    Eigen::Affine3d a_flange_start_,a_flange_end_;    
     Eigen::Matrix3d R_des;
     std::vector<Eigen::VectorXd> optimal_path_;
 
@@ -450,18 +451,18 @@ as_(nh_, "cartTrajActionServer", boost::bind(&cartTrajActionServer::executeCB, t
 
 
 void cartTrajActionServer::executeCB(const actionlib::SimpleActionServer<cartesian_moves::cartTrajAction>::GoalConstPtr& goal) {
-    Eigen::Affine3d a_tool_end;
+    Eigen::Affine3d a_flange_end;
     std::vector<Eigen::VectorXd> optimal_path;    
-    a_tool_end.linear() = R_des;
+    a_flange_end.linear() = R_des;
     Eigen::Vector3d p_end;
     p_end[0] = goal->x;
     p_end[1] = goal->y;    
     p_end[2] = goal->z;
-    cout<<"received goal pt: "<<p_end.transpose()<<endl;
+    cout<<"received flange goal pt: "<<p_end.transpose()<<endl;
     double speed = goal->speed;
-    a_tool_end.translation() = p_end;
+    a_flange_end.translation() = p_end;
     
-    cartesian_path_planner(a_tool_end, optimal_path);
+    cartesian_path_planner(a_flange_end, optimal_path);
     
     ROS_INFO("stuffing traj: " ); 
     trajectory_msgs::JointTrajectory des_trajectory; // an empty trajectory 

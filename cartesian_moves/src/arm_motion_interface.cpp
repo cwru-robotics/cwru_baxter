@@ -60,35 +60,40 @@ private:
     //ros::Publisher  display_traj_pub_;
 
     //globals for main/callback sync:
-    bool g_received_new_request = false;
-    bool g_busy_working_on_a_request = false;
+    bool g_received_new_request_ = false;
+    bool g_busy_working_on_a_request_ = false;
 
     //globals for CB to populate:
-    geometry_msgs::PoseStamped g_poseStamped_start_rqst;
-    geometry_msgs::PoseStamped g_poseStamped_goal_rqst;
+    geometry_msgs::PoseStamped poseStamped_start_rqst_;
+    geometry_msgs::PoseStamped poseStamped_goal_rqst_;
 
-    int g_command_mode = ARM_TEST_MODE;
-    int g_plan_id_rqst = 0;
-    int g_plan_id_resp = 0;
-    bool g_bool_resp = false;
-    int g_rtn_code = 0;
+    int command_mode_ = ARM_TEST_MODE;
+    //int plan_id_rqst_ = 0;
+    //int g_plan_id_resp = 0;
+    //bool g_bool_resp = false;
+    //int g_rtn_code = 0;
 
-    cwru_srv::arm_nav_service_messageRequest g_request;
+    cwru_srv::arm_nav_service_messageRequest request_;
 
-    std_msgs::Float32 g_q_vec_start_msg[], g_q_vec_end_msg[];
+    //std_msgs::Float32 g_q_vec_start_msg[], g_q_vec_end_msg[];
     //these may be specified in request, if desire offset cartesian move
     Eigen::Vector3d delta_p_;
 
 
-    Eigen::VectorXd g_q_vec_start_rqst;
-    Eigen::VectorXd g_q_vec_end_rqst;
-    Eigen::VectorXd g_q_vec_start_resp;
-    Eigen::VectorXd g_q_vec_end_resp;
+    Eigen::VectorXd q_vec_start_rqst_;
+    Eigen::VectorXd q_vec_end_rqst_;
+    Eigen::VectorXd q_vec_start_resp_;
+    Eigen::VectorXd q_vec_end_resp_;
     //Eigen::Affine3d A_start;
     //Eigen::Affine3d A_end;
-    Eigen::Affine3d g_a_tool_start, g_a_tool_end;
+    Eigen::Affine3d a_tool_start_, a_tool_end_;
+    //Eigen::Affine3d g_a_flange_start, g_a_flange_end;
+    Eigen::Affine3d a_flange_end_;
 
-    Eigen::VectorXd g_q_in_vecxd;
+    Eigen::Affine3d A_tool_wrt_flange_;
+
+   
+    //Eigen::VectorXd g_q_in_vecxd;
 
     bool path_is_valid_;
     int path_id_;
@@ -98,8 +103,8 @@ private:
     //trajectory_msgs::JointTrajectory g_des_trajectory; // an empty trajectory
 
     //some handy constants...
-    Eigen::Matrix3d g_R_gripper_down;
-    Vectorq7x1 g_q_pre_pose;
+    Eigen::Matrix3d R_gripper_down_;
+    Vectorq7x1 q_pre_pose_;
     
     sensor_msgs::JointState joint_states_;
     moveit_msgs::DisplayTrajectory display_trajectory_;
@@ -128,36 +133,36 @@ public:
 
     bool plan_cartesian_delta_p(Vectorq7x1 q_start, Eigen::Vector3d delta_p);
 
-    bool plan_path_qstart_to_Agoal(Vectorq7x1 q_start); // provide q_start; assumes use of g_a_tool_end and fills in g_optimal_path
+    bool plan_path_qstart_to_Agoal(Vectorq7x1 q_start); // provide q_start; assumes use of a_flange_end_ and fills in g_optimal_path
     
     bool plan_jspace_path_qstart_to_qend(Vectorq7x1 q_start,Vectorq7x1 q_goal);
 
     bool isBusy(void) {
-        return g_busy_working_on_a_request;
+        return g_busy_working_on_a_request_;
     }
 
     bool newRqst(void) {
-        return g_received_new_request;
+        return g_received_new_request_;
     }
 
     void setNewRqst(bool rcvd_new_rqst) {
-        g_received_new_request = rcvd_new_rqst;
+        g_received_new_request_ = rcvd_new_rqst;
     } // 
 
     void setIsBusy(bool isBusy) {
-        g_busy_working_on_a_request = isBusy;
+        g_busy_working_on_a_request_ = isBusy;
     } // 
 
     int get_cmd_mode(void) {
-        return g_command_mode;
+        return command_mode_;
     }
 
     Eigen::VectorXd get_start_qvec(void) {
-        return g_q_vec_start_rqst;
+        return q_vec_start_rqst_;
     }
 
     Eigen::VectorXd get_end_qvec(void) {
-        return g_q_vec_end_rqst;
+        return q_vec_end_rqst_;
     }
 
     void setPathValid(bool is_valid) {
@@ -188,16 +193,18 @@ ArmMotionInterface::ArmMotionInterface(ros::NodeHandle* nodehandle) : nh_(*nodeh
     //cout<<"done initializing service; initializing member vars: ";
 
     //initialize variables here, as needed
-    g_q_pre_pose << -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, -2.87179;
-    g_q_vec_start_rqst = g_q_pre_pose; // 0,0,0,0,0,0,0; // make this a 7-d vector
-    g_q_vec_end_rqst = g_q_pre_pose; //<< 0,0,0,0,0,0,0;
-    g_q_vec_start_resp = g_q_pre_pose; //<< 0,0,0,0,0,0,0;
-    g_q_vec_end_resp = g_q_pre_pose; //<< 0,0,0,0,0,0,0;
-    g_R_gripper_down = cartTrajPlanner_.get_R_gripper_down();
+    q_pre_pose_ << -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, -2.87179;
+    q_vec_start_rqst_ = q_pre_pose_; // 0,0,0,0,0,0,0; // make this a 7-d vector
+    q_vec_end_rqst_ = q_pre_pose_; //<< 0,0,0,0,0,0,0;
+    q_vec_start_resp_ = q_pre_pose_; //<< 0,0,0,0,0,0,0;
+    q_vec_end_resp_ = q_pre_pose_; //<< 0,0,0,0,0,0,0;
+    R_gripper_down_ = cartTrajPlanner_.get_R_gripper_down();
 
     path_is_valid_ = false;
     path_id_ = 0;
     // can also do tests/waits to make sure all required services, topics, etc are alive
+
+    A_tool_wrt_flange_ = baxter_fwd_solver_.get_affine_tool_wrt_flange();
 }
 
 void ArmMotionInterface::initializeServices() {
@@ -219,7 +226,7 @@ void ArmMotionInterface::initializePublishers()
 
 bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest& request, cwru_srv::arm_nav_service_messageResponse& response) {
     //if busy, refuse new requests;
-    if (g_busy_working_on_a_request || g_received_new_request) {
+    if (g_busy_working_on_a_request_ || g_received_new_request_) {
         response.bool_resp = false; // dummy; //working_on_trajectory; // return status of "working on trajectory"
         response.rtn_code = ARM_REQUEST_REJECTED_ALREADY_BUSY;
         return false; //redundant way to say request was rejected      
@@ -228,7 +235,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     // for a simple status query, handle it now;
     if (request.cmd_mode == ARM_IS_SERVER_BUSY_QUERY) {
         ROS_INFO("rcvd request for query--IS_SERVER_BUSY_QUERY");
-        if (g_busy_working_on_a_request) {
+        if (g_busy_working_on_a_request_) {
             response.rtn_code = ARM_SERVER_IS_BUSY;
         } else {
             response.rtn_code = ARM_SERVER_NOT_BUSY;
@@ -257,19 +264,19 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     }
 
     //if here, ready to accept a new command
-    g_request = request;
+    request_ = request;
 
 
-    g_command_mode = request.cmd_mode;
-    g_received_new_request = true; // alert "main" that a new request came in
+    command_mode_ = request.cmd_mode;
+    g_received_new_request_ = true; // alert "main" that a new request came in
 
     // copy the message data to globals:
     /*
-    g_poseStamped_start_rqst =    request.poseStamped_start;
-    g_poseStamped_goal_rqst = request.poseStamped_goal;
+    poseStamped_start_rqst_ =    request.poseStamped_start;
+    poseStamped_goal_rqst_ = request.poseStamped_goal;
     g_q_vec_start_msg = request.q_vec_start;
     g_q_vec_end_msg= request.q_vec_end;   
-    g_plan_id_rqst = request.plan_id;
+    plan_id_rqst_ = request.plan_id;
      */
     response.bool_resp = true; // dummy; //working_on_trajectory; // return status of "working on trajectory"
     response.rtn_code = ARM_RECEIVED_AND_INITIATED_RQST;
@@ -280,8 +287,8 @@ void ArmMotionInterface::go_to_predefined_pre_pose(void) {
     //start from current jspace pose:
     cout << "called go_to_predefined_pre_pose" << endl;
     cout << "setting q_start and q_end: " << endl;
-    g_q_vec_end_resp = g_q_pre_pose;
-    g_q_vec_end_resp = g_q_vec_right_arm;
+    q_vec_end_resp_ = q_pre_pose_;
+    q_vec_end_resp_ = g_q_vec_right_arm;
     //compute a path here:
 
     //g_q_vec_right_arm =  baxter_traj_streamer.get_qvec_right_arm(); 
@@ -299,8 +306,8 @@ bool ArmMotionInterface::plan_cartesian_delta_p(Vectorq7x1 q_start, Eigen::Vecto
     path_is_valid_ = cartTrajPlanner_.cartesian_path_planner_delta_p(q_start, delta_p, g_optimal_path);
     if (path_is_valid_) {
         ROS_INFO("plan_cartesian_delta_p: computed valid delta-p path");
-        g_q_vec_start_resp = g_optimal_path.front();
-        g_q_vec_end_resp = g_optimal_path.back();
+        q_vec_start_resp_ = g_optimal_path.front();
+        q_vec_end_resp_ = g_optimal_path.back();
     } else {
         ROS_WARN("plan_cartesian_delta_p: path plan attempt not successful");
     }
@@ -318,10 +325,10 @@ bool ArmMotionInterface::plan_jspace_path_qstart_to_qend(Vectorq7x1 q_start,Vect
 bool ArmMotionInterface::plan_path_to_predefined_pre_pose(void) {
     cout << "called plan_path_to_predefined_pre_pose" << endl;
     cout << "setting q_start and q_end: " << endl;
-    g_q_vec_end_resp = g_q_pre_pose;
-    cout << "q pre-pose goal: " << g_q_vec_end_resp.transpose() << endl;
-    g_q_vec_start_resp = g_q_vec_right_arm;
-    cout << "q start = current arm state: " << g_q_vec_start_resp.transpose() << endl;
+    q_vec_end_resp_ = q_pre_pose_;
+    cout << "q pre-pose goal: " << q_vec_end_resp_.transpose() << endl;
+    q_vec_start_resp_ = g_q_vec_right_arm;
+    cout << "q start = current arm state: " << q_vec_start_resp_.transpose() << endl;
     //plan a path: from q-start to q-goal...what to do with wrist??
     cout<<"NOT DONE YET"<<endl;
     path_is_valid_ =false;
@@ -329,23 +336,23 @@ bool ArmMotionInterface::plan_path_to_predefined_pre_pose(void) {
 
 }
 
-bool ArmMotionInterface::plan_path_qstart_to_Agoal(Vectorq7x1 q_start) { // provide q_start; assumes use of g_a_tool_end and fills in g_optimal_path 
-    path_is_valid_ = cartTrajPlanner_.cartesian_path_planner(q_start, g_a_tool_end, g_optimal_path);
+bool ArmMotionInterface::plan_path_qstart_to_Agoal(Vectorq7x1 q_start) { // provide q_start; assumes use of a_flange_end_ and fills in g_optimal_path 
+    path_is_valid_ = cartTrajPlanner_.cartesian_path_planner(q_start, a_flange_end_, g_optimal_path);
     return path_is_valid_;
 }
 
 //convert float32[] from request into Eigen type for joint-space start vector;
 
 bool ArmMotionInterface::unpack_qstart(void) {
-    //Eigen::VectorXd g_q_vec_start_rqst;
-    //g_request
-    int njoints = g_request.q_vec_start.size();
+    //Eigen::VectorXd q_vec_start_rqst_;
+    //request_
+    int njoints = request_.q_vec_start.size();
     cout << "size of request q_start: " << njoints << endl;
     if (njoints != 7) {
         return false;
     }
     for (int i = 0; i < 7; i++) {
-        g_q_vec_start_rqst[i] = g_request.q_vec_start[i];
+        q_vec_start_rqst_[i] = request_.q_vec_start[i];
     }
     return true;
 }
@@ -353,30 +360,30 @@ bool ArmMotionInterface::unpack_qstart(void) {
 //convert float32[] from request into Eigen type for joint-space end vector;
 
 bool ArmMotionInterface::unpack_qend(void) {
-    int njoints = g_request.q_vec_end.size();
+    int njoints = request_.q_vec_end.size();
     //cout<<"size of request q_end: "<< njoints<<endl;
     if (njoints != 7) {
         ROS_WARN("received bad joint-space goal: njoints = %d",njoints);
         return false;
     }
     for (int i = 0; i < 7; i++) {
-        g_q_vec_end_rqst[i] = g_request.q_vec_end[i];
+        q_vec_end_rqst_[i] = request_.q_vec_end[i];
     }
-    cout<<"unpacked q_vec_goal from request: "<<g_q_vec_end_rqst.transpose()<<endl;
+    cout<<"unpacked q_vec_goal from request: "<<q_vec_end_rqst_.transpose()<<endl;
     return true;
 }
 
 //convert goal pose from request into Eigen::Affine type for end pose;
-// Eigen::Affine3d g_a_tool_start,g_a_tool_end;
-// populate g_a_tool_end from g_request.poseStamped_goal
+// populate a_flange_end_ and g_a_tool_end from request_.poseStamped_goal
 
+//xxx fill in a_flange_end_!!
 bool ArmMotionInterface::unpack_goal_pose(void) {
-    geometry_msgs::PoseStamped poseStamped_goal = g_request.poseStamped_goal;
+    geometry_msgs::PoseStamped poseStamped_goal = request_.poseStamped_goal;
     Eigen::Vector3d goal_origin;
     goal_origin[0] = poseStamped_goal.pose.position.x;
     goal_origin[1] = poseStamped_goal.pose.position.y;
     goal_origin[2] = poseStamped_goal.pose.position.z;
-    g_a_tool_end.translation() = goal_origin;
+    a_tool_end_.translation() = goal_origin;
 
     Eigen::Quaterniond quat;
     quat.x() = poseStamped_goal.pose.orientation.x;
@@ -384,7 +391,8 @@ bool ArmMotionInterface::unpack_goal_pose(void) {
     quat.z() = poseStamped_goal.pose.orientation.z;
     quat.w() = poseStamped_goal.pose.orientation.w;
     Eigen::Matrix3d R_goal(quat);
-    g_a_tool_end.linear() = R_goal;
+    a_tool_end_.linear() = R_goal;
+    a_flange_end_ = a_tool_end_*A_tool_wrt_flange_.inverse();
 
 
     return true;
@@ -393,13 +401,13 @@ bool ArmMotionInterface::unpack_goal_pose(void) {
 // need this fnc if client requests a specific delta-p move
 
 bool ArmMotionInterface::unpack_delta_p(void) {
-    int npts = g_request.delta_p.size();
+    int npts = request_.delta_p.size();
     if (npts != 3) {
         ROS_WARN("plan_cartesian_delta_p: request delta_p is wrong size");
         return false;
     }
     //copy message data to member var:
-    for (int i = 0; i < 3; i++) delta_p_(i) = g_request.delta_p[i];
+    for (int i = 0; i < 3; i++) delta_p_(i) = request_.delta_p[i];
     cout << "requested delta_p: " << delta_p_.transpose() << endl;
 }
 
@@ -408,7 +416,7 @@ bool ArmMotionInterface::unpack_delta_p(void) {
 void ArmMotionInterface::pack_qstart(cwru_srv::arm_nav_service_messageResponse& response) {
     response.q_vec_start.clear();
     for (int i = 0; i < 7; i++) {
-        response.q_vec_start.push_back(g_q_vec_start_resp[i]);
+        response.q_vec_start.push_back(q_vec_start_resp_[i]);
     }
 }
 
@@ -418,7 +426,7 @@ void ArmMotionInterface::pack_qstart(cwru_srv::arm_nav_service_messageResponse& 
 void ArmMotionInterface::pack_qend(cwru_srv::arm_nav_service_messageResponse& response) {
     response.q_vec_end.clear();
     for (int i = 0; i < 7; i++) {
-        response.q_vec_end.push_back(g_q_vec_end_resp[i]);
+        response.q_vec_end.push_back(q_vec_end_resp_[i]);
     }
 }
 
@@ -500,8 +508,8 @@ int main(int argc, char** argv) {
         g_q_vec_right_arm = baxter_traj_streamer.get_qvec_right_arm(); // update the current sensed arm angles
         //decide if should start processing a new request:
         if (armMotionInterface.newRqst()&&!armMotionInterface.isBusy()) {
-            armMotionInterface.setNewRqst(false); //g_received_new_request=false; // reset trigger to receive a new request
-            armMotionInterface.setIsBusy(true); //g_busy_working_on_a_request= true; // begin processing new request
+            armMotionInterface.setNewRqst(false); //g_received_new_request_=false; // reset trigger to receive a new request
+            armMotionInterface.setIsBusy(true); //g_busy_working_on_a_request_= true; // begin processing new request
         }
         if (armMotionInterface.isBusy()) {
             switch (armMotionInterface.get_cmd_mode()) {
@@ -555,9 +563,9 @@ int main(int argc, char** argv) {
                         ros::spinOnce();
                         ros::Duration(0.01).sleep();
                     }
-                    //armMotionInterface.unpack_qstart(); // fills in g_q_vec_start_rqst--no...use current arm pose
-                    armMotionInterface.unpack_goal_pose(); //fills in g_a_tool_end;  should check return status   
-                    //    bool plan_path_qstart_to_Agoal(Vectorq7x1 q_start); // provide q_start; assumes use of g_a_tool_end and fills in g_optimal_path 
+                    //armMotionInterface.unpack_qstart(); // fills in q_vec_start_rqst_--no...use current arm pose
+                    armMotionInterface.unpack_goal_pose(); //fills in a_flange_end_;  should check return status   
+                    //    bool plan_path_qstart_to_Agoal(Vectorq7x1 q_start); // provide q_start; assumes use of a_flange_end_ and fills in g_optimal_path 
                     is_valid = armMotionInterface.plan_path_qstart_to_Agoal(g_q_vec_right_arm);
                     if (is_valid) ROS_INFO("computed valid path");
                     else ROS_INFO("no valid path found");

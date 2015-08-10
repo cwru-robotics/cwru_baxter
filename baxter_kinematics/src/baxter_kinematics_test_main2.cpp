@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
     cout<<Rflange<<endl;
     
     //compare to fwd kin soln:
-    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot);
+    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_snapshot);
     cout<<"O of hand wrt torso from fwd kin: "<<Affine_flange_wrt_torso.translation().transpose()<<endl;
     cout<<"R of hand wrt torso from fwd kin:"<<endl;
     cout<<Affine_flange_wrt_torso.linear()<<endl;
@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
         q_snapshot = q_vec_right_arm;
         cout<<"qvec right arm: "<<endl;
         cout<< q_snapshot.transpose() <<endl;
-            A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_snapshot); //fwd_kin_solve
+            A_fwd_DH = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_snapshot); //fwd_kin_solve
 
             //get and print solutions--origins off selected frames
             A_shoulder = baxter_fwd_solver.get_shoulder_frame();
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
             Eigen::Affine3d affine_flange(A_flange);   
 
         //PROVIDE q_s0 to compute wrist pt w/rt frame1
-        wrist_pt_wrt_right_arm_frame1 = baxter_IK_solver.wrist_frame1_from_tool_wrt_rarm_mount(affine_flange,q_snapshot);
+        wrist_pt_wrt_right_arm_frame1 = baxter_IK_solver.wrist_frame1_from_flange_wrt_rarm_mount(affine_flange,q_snapshot);
         cout<< "w w/rt frame1 from fwd kin code: "<<wrist_pt_wrt_right_arm_frame1.transpose()<<endl;
         
     tferr=true;
@@ -308,7 +308,7 @@ int main(int argc, char **argv) {
     reachable = true;
     double dqs0 = 0.001;
     q_s0 = q_s0_ctr;
-    Eigen::Vector3d w_des_wrt_0 = baxter_IK_solver.wrist_frame0_from_tool_wrt_rarm_mount(affine_flange);
+    Eigen::Vector3d w_des_wrt_0 = baxter_IK_solver.wrist_frame0_from_flange_wrt_rarm_mount(affine_flange);
     while (reachable) { 
         cout<<"try q_s0 = "<<q_s0<<endl;
         reachable = baxter_IK_solver.compute_q123_solns(affine_flange, q_s0, q_solns); 
@@ -316,7 +316,7 @@ int main(int argc, char **argv) {
             //test these solns:
             cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
             for (int i=0;i<q_solns.size();i++) {
-                A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_solns[i]);
+                A_fwd_DH = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_solns[i]);
                 A_wrist = baxter_fwd_solver.get_wrist_frame();
                 std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
             }
@@ -355,7 +355,7 @@ int main(int argc, char **argv) {
             //test these solns:
             cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
             for (int i=0;i<q_solns.size();i++) {
-                A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_solns[i]);
+                A_fwd_DH = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_solns[i]);
                 A_wrist = baxter_fwd_solver.get_wrist_frame();
                 std::cout << "sln"<<i<<":  w_wrt_0 " << A_wrist(0, 3) << ", " << A_wrist(1, 3) << ", " << A_wrist(2, 3) << std::endl;
             }

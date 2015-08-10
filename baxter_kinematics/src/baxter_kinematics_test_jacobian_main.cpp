@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
         
         cout<<"qvec right arm: "<<endl;
         cout<< q_snapshot.transpose() <<endl;
-        affine_flange = baxter_fwd_solver.fwd_kin_solve(q_snapshot); //fwd_kin_solve 
+        affine_flange = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_snapshot); //fwd_kin_solve 
 
        // wrist_pt_wrt_right_arm_frame1 = baxter_IK_solver.wrist_frame1_from_tool_wrt_rarm_mount(affine_flange,q_snapshot);
         wrist_pt_wrt_right_arm_frame1 = baxter_fwd_solver.get_wrist_coords_wrt_frame1(q_snapshot);
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
         cout<<"qvec perturbed: "<<endl;
         cout<< q_perturbed.transpose() <<endl;
         
-        affine_flange_perturbed = baxter_fwd_solver.fwd_kin_solve(q_perturbed); //fwd_kin_solve
+        affine_flange_perturbed = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_perturbed); //fwd_kin_solve
 
         w_perturbed = baxter_fwd_solver.get_wrist_coords_wrt_frame1(q_perturbed);
         cout<< "perturbed w w/rt frame1: "<<w_perturbed.transpose()<<endl;   

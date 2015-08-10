@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
     Baxter_fwd_solver baxter_fwd_solver; //instantiate a forward-kinematics solver
     Baxter_IK_solver baxter_IK_solver;  // instantiate an IK solver
     
-    Eigen::Affine3d Affine_flange_wrt_utorso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot);
+    Eigen::Affine3d Affine_flange_wrt_utorso = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_snapshot);
     
     std::vector<Vectorq7x1> q_solns;    
     int nsolns = baxter_IK_solver.ik_solve_approx(Affine_flange_wrt_utorso,q_solns);  

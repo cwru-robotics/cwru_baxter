@@ -79,24 +79,24 @@ Baxter_fwd_solver::Baxter_fwd_solver() { //(const hand_s& hs, const atlas_frame&
     //this is a bit of a misnomer.  The Baxter URDF frame "right_lower_forearm" rotates as a function of q_s0.
     //However, D-H wants to define a frame with z0 axis along the s0 joint axis;
     //Define a static transform from arm_mount frame to D-H 0-frame
-    A_rarm_mount_to_r_lower_forearm = Eigen::Matrix4d::Identity();
-    A_rarm_mount_to_r_lower_forearm(0,3) = rmount_to_r_lower_forearm_x;
-    A_rarm_mount_to_r_lower_forearm(1,3) = rmount_to_r_lower_forearm_y;
-    A_rarm_mount_to_r_lower_forearm(2,3) = rmount_to_r_lower_forearm_z;
-    Affine_rarm_mount_to_r_lower_forearm = A_rarm_mount_to_r_lower_forearm; // affine version of above
+    A_rarm_mount_to_r_lower_forearm_ = Eigen::Matrix4d::Identity();
+    A_rarm_mount_to_r_lower_forearm_(0,3) = rmount_to_r_lower_forearm_x;
+    A_rarm_mount_to_r_lower_forearm_(1,3) = rmount_to_r_lower_forearm_y;
+    A_rarm_mount_to_r_lower_forearm_(2,3) = rmount_to_r_lower_forearm_z;
+    Affine_rarm_mount_to_r_lower_forearm_ = A_rarm_mount_to_r_lower_forearm_; // affine version of above
     //ROS_INFO("fwd_solver constructor");
     //there is also a static transform between torso and right-arm mount
     //manually populate values for this transform...
-    A_torso_to_rarm_mount = Eigen::Matrix4d::Identity();
-    A_torso_to_rarm_mount(0,3) = torso_to_rmount_x;
-    A_torso_to_rarm_mount(1,3) = torso_to_rmount_y;
-    A_torso_to_rarm_mount(2,3) = torso_to_rmount_z;  
-    A_torso_to_rarm_mount(0,0) = cos(theta_z_arm_mount);
-    A_torso_to_rarm_mount(0,0) = cos(theta_z_arm_mount); 
-    A_torso_to_rarm_mount(1,1) = cos(theta_z_arm_mount);
-    A_torso_to_rarm_mount(0,1) = -sin(theta_z_arm_mount);  
-    A_torso_to_rarm_mount(1,0) = -A_torso_to_rarm_mount(0,1); 
-    Affine_torso_to_rarm_mount = A_torso_to_rarm_mount;
+    A_torso_to_rarm_mount_ = Eigen::Matrix4d::Identity();
+    A_torso_to_rarm_mount_(0,3) = torso_to_rmount_x;
+    A_torso_to_rarm_mount_(1,3) = torso_to_rmount_y;
+    A_torso_to_rarm_mount_(2,3) = torso_to_rmount_z;  
+    A_torso_to_rarm_mount_(0,0) = cos(theta_z_arm_mount);
+    A_torso_to_rarm_mount_(0,0) = cos(theta_z_arm_mount); 
+    A_torso_to_rarm_mount_(1,1) = cos(theta_z_arm_mount);
+    A_torso_to_rarm_mount_(0,1) = -sin(theta_z_arm_mount);  
+    A_torso_to_rarm_mount_(1,0) = -A_torso_to_rarm_mount_(0,1); 
+    Affine_torso_to_rarm_mount_ = A_torso_to_rarm_mount_;
     
     Eigen::Matrix3d R_hand;
     Eigen::Vector3d O_hand;
@@ -119,6 +119,7 @@ Baxter_fwd_solver::Baxter_fwd_solver() { //(const hand_s& hs, const atlas_frame&
     //A_tool_to_flange_ = ...;
     A_tool_wrt_flange_.linear() = R_hand;
     A_tool_wrt_flange_.translation() = O_hand;
+    A_tool_wrt_flange_inv_ = A_tool_wrt_flange_.inverse();
 }
 
 
@@ -171,7 +172,7 @@ Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_r_arm_mount_solve_approx(c
 Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_torso_solve(const Vectorq7x1& q_vec) {
     Eigen::Matrix4d M;
     M = fwd_kin_solve_(q_vec);
-    M = A_torso_to_rarm_mount*M;
+    M = A_torso_to_rarm_mount_*M;
     Eigen::Affine3d A(M);
     return A;
 }
@@ -179,47 +180,47 @@ Eigen::Affine3d Baxter_fwd_solver::fwd_kin_flange_wrt_torso_solve(const Vectorq7
 
 
 Eigen::Matrix4d Baxter_fwd_solver::get_wrist_frame() {
-    return A_mat_products[5]; // frames 4 and 5 have coincident origins
+    return A_mat_products_[5]; // frames 4 and 5 have coincident origins
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_shoulder_frame() {
-    return A_mat_products[0]; // frame 1 has coincident origin, since a2=d2=0
+    return A_mat_products_[0]; // frame 1 has coincident origin, since a2=d2=0
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_elbow_frame() {
-    return A_mat_products[3]; // frames 2 and 3 have coincident origins
+    return A_mat_products_[3]; // frames 2 and 3 have coincident origins
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_flange_frame() {
-    return A_mat_products[6];
+    return A_mat_products_[6];
 }
 
 
 Eigen::Matrix4d Baxter_fwd_solver::get_shoulder_frame_approx() {
-    return A_mat_products_approx[0]; // frame 1 has coincident origin, since a2=d2=0
+    return A_mat_products_approx_[0]; // frame 1 has coincident origin, since a2=d2=0
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_elbow_frame_approx() {
-    return A_mat_products_approx[3]; // frames 2 and 3 have coincident origins
+    return A_mat_products_approx_[3]; // frames 2 and 3 have coincident origins
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_wrist_frame_approx() {
     Eigen::Matrix4d A_wrist;
-    A_wrist = A_mat_products_approx[5];
+    A_wrist = A_mat_products_approx_[5];
     //cout<<"A_wrist from get_wrist: "<<endl;
     //cout<<A_wrist<<endl;
     return A_wrist; // frames 4 and 5 have coincident origins
 }
 
 Eigen::Matrix4d Baxter_fwd_solver::get_flange_frame_approx() {
-    return A_mat_products_approx[6];
+    return A_mat_products_approx_[6];
 }
 
 //fwd kin from frame 1 to wrist pt
 Eigen::Vector3d Baxter_fwd_solver::get_wrist_coords_wrt_frame1(const Vectorq7x1& q_vec) {
     Eigen::Matrix4d A_shoulder_to_wrist;
     fwd_kin_solve_(q_vec);
-    A_shoulder_to_wrist = A_mats[1]*A_mats[2]*A_mats[3]*A_mats[4];
+    A_shoulder_to_wrist = A_mats_[1]*A_mats_[2]*A_mats_[3]*A_mats_[4];
     Eigen::Vector3d w_wrt_1 = A_shoulder_to_wrist.block<3, 1>(0, 3);
     return w_wrt_1;
 }
@@ -290,7 +291,7 @@ Eigen::Matrix3d Baxter_fwd_solver::get_wrist_Jacobian_3x3(double q_s1, double q_
 }
 
 // confirmed this function is silly...
-// can easily transform Affine frames or A4x4 frames w:  Affine_torso_to_rarm_mount.inverse()*pose_wrt_torso;
+// can easily transform Affine frames or A4x4 frames w:  Affine_torso_to_rarm_mount_.inverse()*pose_wrt_torso;
 Eigen::Affine3d Baxter_fwd_solver::transform_affine_from_torso_frame_to_arm_mount_frame(Eigen::Affine3d pose_wrt_torso) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     /*
@@ -298,8 +299,8 @@ Eigen::Affine3d Baxter_fwd_solver::transform_affine_from_torso_frame_to_arm_moun
     Eigen::Matrix3d R_hand_des_wrt_torso = pose_wrt_torso.linear();
     Eigen::Vector3d O_hand_des_wrt_torso = pose_wrt_torso.translation();
     Eigen::Vector3d O_hand_des_wrt_arm_mount;
-    Eigen::Vector3d O_arm_mount_wrt_torso = A_torso_to_rarm_mount.col(3).head(3);
-    Eigen::Matrix3d R_arm_mount_wrt_torso = A_torso_to_rarm_mount.block<3, 3>(0, 0);
+    Eigen::Vector3d O_arm_mount_wrt_torso = A_torso_to_rarm_mount_.col(3).head(3);
+    Eigen::Matrix3d R_arm_mount_wrt_torso = A_torso_to_rarm_mount_.block<3, 3>(0, 0);
     
     desired_pose_wrt_arm_mount.linear() = R_arm_mount_wrt_torso.transpose()*R_hand_des_wrt_torso;
  
@@ -316,7 +317,7 @@ Eigen::Affine3d Baxter_fwd_solver::transform_affine_from_torso_frame_to_arm_moun
     cout<<"origin of des frame w/rt arm-mount frame: "<<desired_pose_wrt_arm_mount.translation().transpose()<<endl;
 
     // now, try easier approach:
-    desired_pose_wrt_arm_mount2 = Affine_torso_to_rarm_mount.inverse()*pose_wrt_torso;
+    desired_pose_wrt_arm_mount2 = Affine_torso_to_rarm_mount_.inverse()*pose_wrt_torso;
      cout<<"input pose w/rt arm-mount frame, method 2: R"<<endl;
     cout<<desired_pose_wrt_arm_mount2.linear()<<endl;    
     cout<<"origin of des frame w/rt arm-mount frame, method 2: "<<desired_pose_wrt_arm_mount2.translation().transpose()<<endl;   
@@ -324,7 +325,7 @@ Eigen::Affine3d Baxter_fwd_solver::transform_affine_from_torso_frame_to_arm_moun
     
     return desired_pose_wrt_arm_mount;
      * */
-    return Affine_torso_to_rarm_mount.inverse()*pose_wrt_torso;
+    return Affine_torso_to_rarm_mount_.inverse()*pose_wrt_torso;
 }
 
 //inner fwd-kin fnc: computes tool-flange frame w/rt right_arm_mount frame
@@ -339,19 +340,19 @@ Eigen::Matrix4d Baxter_fwd_solver::fwd_kin_solve_(const Vectorq7x1& q_vec) {
     for (int i = 0; i < 7; i++) {
         //A_i_iminusi = compute_A_of_DH(DH_a_params[i],DH_d_params[i],DH_alpha_params[i], q_vec[i] + DH_q_offsets[i] );
         A_i_iminusi = compute_A_of_DH(i, q_vec[i]);
-        A_mats[i] = A_i_iminusi;
+        A_mats_[i] = A_i_iminusi;
         //std::cout << "A_mats[" << i << "]:" << std::endl;
-        //std::cout << A_mats[i] << std::endl;
+        //std::cout << A_mats_[i] << std::endl;
     }
 
-    A_mat_products[0] = A_mats[0];
+    A_mat_products_[0] = A_mats_[0];
     //account for static offset from Baxter's right-arm mount frame
-    A_mat_products[0] = A_rarm_mount_to_r_lower_forearm*A_mat_products[0];
+    A_mat_products_[0] = A_rarm_mount_to_r_lower_forearm_*A_mat_products_[0];
     for (int i = 1; i < 7; i++) {
-        A_mat_products[i] = A_mat_products[i - 1] * A_mats[i];
+        A_mat_products_[i] = A_mat_products_[i - 1] * A_mats_[i];
     }
     
-    return A_mat_products[6]; //tool flange frame
+    return A_mat_products_[6]; //tool flange frame
 }
 
 //same as above, but with spherical wrist approximation
@@ -364,47 +365,47 @@ Eigen::Matrix4d Baxter_fwd_solver::fwd_kin_solve_approx_(const Vectorq7x1& q_vec
     for (int i = 0; i < 7; i++) {
         //A_i_iminusi = compute_A_of_DH(DH_a_params[i],DH_d_params[i],DH_alpha_params[i], q_vec[i] + DH_q_offsets[i] );
         A_i_iminusi = compute_A_of_DH_approx(i, q_vec[i]);
-        A_mats_approx[i] = A_i_iminusi;
+        A_mats_approx_[i] = A_i_iminusi;
         //std::cout << "A_mats_approx[" << i << "]:" << std::endl;
-        //std::cout << A_mats_approx[i] << std::endl;
+        //std::cout << A_mats_approx_[i] << std::endl;
     }
 
-    A_mat_products_approx[0] = A_mats_approx[0];
+    A_mat_products_approx_[0] = A_mats_approx_[0];
 
     //account for static offset from Baxter's right-arm mount frame
-    A_mat_products_approx[0] = A_rarm_mount_to_r_lower_forearm*A_mat_products_approx[0];
+    A_mat_products_approx_[0] = A_rarm_mount_to_r_lower_forearm_*A_mat_products_approx_[0];
     //cout<<"A_mat_products_approx[0]"<<endl;
-    //cout<<A_mat_products_approx[0]<<endl;    
+    //cout<<A_mat_products_approx_[0]<<endl;    
     for (int i = 1; i < 7; i++) {
-        A_mat_products_approx[i] = A_mat_products_approx[i - 1] * A_mats_approx[i];
+        A_mat_products_approx_[i] = A_mat_products_approx_[i - 1] * A_mats_approx_[i];
         //std::cout << "A_mat_products_approx[" << i << "]:" << std::endl;
-        //std::cout << A_mat_products_approx[i] << std::endl;        
+        //std::cout << A_mat_products_approx_[i] << std::endl;        
     }
-    //cout<<"A_mat_products_approx[6]"<<endl;
-    //cout<<A_mat_products_approx[6]<<endl;    
+    //cout<<"A_mat_products_approx_[6]"<<endl;
+    //cout<<A_mat_products_approx_[6]<<endl;    
     
-    return A_mat_products_approx[6]; //tool flange frame
+    return A_mat_products_approx_[6]; //tool flange frame
 }
 
 //IK methods:
 Baxter_IK_solver::Baxter_IK_solver() {
     //constructor: 
     //ROS_INFO("Baxter_IK_solver constructor");
-    L_humerus = 0.37082; // diag distance from shoulder to elbow; //DH_d_params[2];
+    L_humerus_ = 0.37082; // diag distance from shoulder to elbow; //DH_d_params[2];
     double L3 = DH_d3;
     double A3 = DH_a3;
-    //L_humerus = sqrt(A3 * A3 + L3 * L3);
-    L_forearm = DH_d5; // d-value is approx len, ignoring offset; 0.37442; // diag dist from elbow to wrist; //sqrt(A3 * A3 + L3 * L3);
+    //L_humerus_ = sqrt(A3 * A3 + L3 * L3);
+    L_forearm_ = DH_d5; // d-value is approx len, ignoring offset; 0.37442; // diag dist from elbow to wrist; //sqrt(A3 * A3 + L3 * L3);
     
-    phi_shoulder= acos((-A3*A3+L_humerus*L_humerus+L3*L3)/(2.0*L3*L_humerus));
+    phi_shoulder_= acos((-A3*A3+L_humerus_*L_humerus_+L3*L3)/(2.0*L3*L_humerus_));
     // the following is redundant w/ fwd_solver instantiation, but repeat here, in case fwd solver
     // is not created
-    //A_rarm_mount_to_r_lower_forearm = Eigen::Matrix4d::Identity();
-    //A_rarm_mount_to_r_lower_forearm(0,3) = rmount_to_r_lower_forearm_x;
-    //A_rarm_mount_to_r_lower_forearm(1,3) = rmount_to_r_lower_forearm_y;
-    //A_rarm_mount_to_r_lower_forearm(2,3) = rmount_to_r_lower_forearm_z;  
+    //A_rarm_mount_to_r_lower_forearm_ = Eigen::Matrix4d::Identity();
+    //A_rarm_mount_to_r_lower_forearm_(0,3) = rmount_to_r_lower_forearm_x;
+    //A_rarm_mount_to_r_lower_forearm_(1,3) = rmount_to_r_lower_forearm_y;
+    //A_rarm_mount_to_r_lower_forearm_(2,3) = rmount_to_r_lower_forearm_z;  
     //cout<<"A_rarm_mount_to_r_lower_forearm"<<endl; // this was populated by inherited fwd_kin constructor
-    //cout<<A_rarm_mount_to_r_lower_forearm<<endl;
+    //cout<<A_rarm_mount_to_r_lower_forearm_<<endl;
 }
 
 //accessor function to get all solutions
@@ -413,7 +414,7 @@ void Baxter_IK_solver::get_solns(std::vector<Vectorq7x1> &q_solns) {
     q_solns = q_solns_fit; //q7dof_solns;
 }
 
-Eigen::Vector3d Baxter_IK_solver::wrist_frame0_from_tool_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame) {
+Eigen::Vector3d Baxter_IK_solver::wrist_frame0_from_flange_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame) {
     Eigen::Vector3d flange_z_axis_wrt_arm_mount;
     Eigen::Vector3d flange_origin_wrt_arm_mount;
     Eigen::Vector3d wrist_pt_vec_wrt_arm_mount;
@@ -432,7 +433,7 @@ Eigen::Vector3d Baxter_IK_solver::wrist_frame0_from_tool_wrt_rarm_mount(Eigen::A
 //this is a misnomer:  should be wrist_pt_wrt_frame1_of_flange_des_and_qs0()
 // given a desired hand pose, compute the wrist point by backing up from z_des by dist from flange to wrist;
 // THEN, re-express this wrist point in the S1 coordinate frame--which requires knowledge of q_s0
-Eigen::Vector3d Baxter_IK_solver::wrist_frame1_from_tool_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame, Vectorq7x1 q_vec) {
+Eigen::Vector3d Baxter_IK_solver::wrist_frame1_from_flange_wrt_rarm_mount(Eigen::Affine3d affine_flange_frame, Vectorq7x1 q_vec) {
     return wrist_pt_wrt_frame1_of_flange_des_and_qs0(affine_flange_frame,q_vec);
 }
 
@@ -567,14 +568,14 @@ int Baxter_IK_solver::ik_solve(Eigen::Affine3d const& desired_hand_pose) // solv
 int Baxter_IK_solver::ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
-    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso;
+    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount_.inverse()*desired_hand_pose_wrt_torso;
     ik_solve_approx(desired_hand_pose_wrt_arm_mount,q_solns);
 }
 
 int Baxter_IK_solver::ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
-    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso;
+    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount_.inverse()*desired_hand_pose_wrt_torso;
     ik_wrist_solve_approx(desired_hand_pose_wrt_arm_mount,q_solns); // given desired hand pose, find all viable IK solns for wrist point only
 }
 
@@ -583,7 +584,7 @@ int Baxter_IK_solver::ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& d
 int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const& desired_hand_pose_wrt_torso,double q_s0, std::vector<Vectorq7x1> &q_solns) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
-    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso;
+    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount_.inverse()*desired_hand_pose_wrt_torso;
     Eigen::Matrix3d Rdes = desired_hand_pose_wrt_arm_mount.linear();
     q_solns.clear();
 
@@ -627,7 +628,7 @@ int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_
   int nsolns=0;
   q_solns.clear(); // fill in all valid solns in this list
   q_solns_123.clear();  
-  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_hand_pose);
+  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_flange_wrt_rarm_mount(desired_hand_pose);
   Eigen::Affine3d A_fwd_DH;  
   Eigen::Matrix4d A_wrist;
   Eigen::Matrix3d Rdes = desired_hand_pose.linear();
@@ -684,15 +685,15 @@ int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_
 }
 
 
-
-// assumes desired_hand_pose is w/rt D-H frame 0;
-// actually..."desire_hand_pose"  is a flange pose...does not account for Yale hand offset and rotation
+// IK of given flange pose, expressed w/rt D-H frame 0;
+// assumes desired_flange_pose is w/rt D-H frame 0;
+// flange pose...does not account for Yale hand offset and rotation
 // use ik_solve_approx_wrt_torso if hand frame is expressed w/rt torso
-//major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
+//major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_flange_pose
 // for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
-int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns) // given desired hand pose, find all viable IK solns
+int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_flange_pose,std::vector<Vectorq7x1> &q_solns) // given desired hand pose, find all viable IK solns
 { 
-  double q_s0_ctr = compute_qs0_ctr(desired_hand_pose);
+  double q_s0_ctr = compute_qs0_ctr(desired_flange_pose);
   //cout<<"ik_solve_approx: q_s0_ctr = "<<q_s0_ctr<<endl;
   double dqs0 = DQS0; // search resolution on dq0
   double  q_s0 = q_s0_ctr;
@@ -701,19 +702,19 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
   int nsolns=0;
   q_solns.clear(); // fill in all valid solns in this list
   q_solns_123.clear();  
-  Eigen::Affine3d desired_flange_pose;
+  //Eigen::Affine3d desired_flange_pose;
+  //desired_flange_pose = A_tool_wrt_flange_inv_*desired_flange_pose;
   
-  desired_flange_pose = A_tool_wrt_flange_.inverse()*desired_hand_pose;
-  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_flange_pose);
+  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_flange_wrt_rarm_mount(desired_flange_pose);
 
-  //Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_hand_pose);
+  //Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_tool_wrt_rarm_mount(desired_flange_pose);
   Eigen::Affine3d A_fwd_DH;  
   Eigen::Matrix4d A_wrist;
-  Eigen::Matrix3d Rdes = desired_hand_pose.linear();
+  Eigen::Matrix3d Rdes = desired_flange_pose.linear();
   bool reachable = true;  
   while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        reachable = compute_q123_solns(desired_flange_pose, q_s0, q_solns_of_qs0); 
         
         if (reachable ) {
             //test these solns:
@@ -747,7 +748,7 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
     q_solns_123.clear();
     while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        reachable = compute_q123_solns(desired_flange_pose, q_s0, q_solns_of_qs0); 
         if (reachable ) {
             //test these solns:
             //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
@@ -779,15 +780,15 @@ int Baxter_IK_solver::ik_solve_approx(Eigen::Affine3d const& desired_hand_pose,s
 return q_solns.size(); // return number of solutions found
 }
 
-//this function takes a desired_hand_pose (with respect to torso frame) and computes elbow options, organized as:
+//this function takes a desired_flange_pose (with respect to torso frame) and computes elbow options, organized as:
 //samples of q_s0 from q_s0_min to q_s0_max define "layers"
 // each "layer" contains IK solns at fixed q_s0
 
-int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<std::vector<Eigen::VectorXd> > &path_options) {
+int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eigen::Affine3d const& desired_flange_pose_wrt_torso,std::vector<std::vector<Eigen::VectorXd> > &path_options) {
     //std::vector<std::vector<Eigen::VectorXd> > path_options; 
-  Eigen::Affine3d   desired_hand_pose_wrt_rarm_mount=Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso; //related to torso via static transforms 
-  Eigen::Matrix3d   Rdes = desired_hand_pose_wrt_rarm_mount.linear();
-  double q_s0_ctr = compute_qs0_ctr(desired_hand_pose_wrt_rarm_mount);
+  Eigen::Affine3d   desired_flange_pose_wrt_rarm_mount=Affine_torso_to_rarm_mount_.inverse()*desired_flange_pose_wrt_torso; //related to torso via static transforms 
+  Eigen::Matrix3d   Rdes = desired_flange_pose_wrt_rarm_mount.linear();
+  double q_s0_ctr = compute_qs0_ctr(desired_flange_pose_wrt_rarm_mount);
   double dqs0 = DQS0; // search resolution on dq0
   double q_s0= q_s0_ctr;
 
@@ -802,7 +803,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
    // find solns in order from q_s0 to q_s0_max; reorder these solns later
   while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
+        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_flange_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
                  single_layer_nodes.clear();            
@@ -830,7 +831,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
     q_s0 = q_s0_ctr - dqs0;
     while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
+        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_flange_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
             single_layer_nodes.clear();            
@@ -844,7 +845,6 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
     }
     //cout<<"found q_s0 min = "<<q_s0<<endl;
    
-    //desired_hand_pose_wrt_torso
     return path_options.size(); // should be number of q_s0 samples
 }
 
@@ -853,12 +853,12 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_from_flange_pose_wrt_torso(Eig
 
 int Baxter_IK_solver::ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_wrt_torso(
         Vectorq7x1 q_start, std::vector<std::vector<Eigen::VectorXd> > &path_options) {
-  Eigen::Affine3d desired_hand_pose_wrt_torso= fwd_kin_solve_wrt_torso(q_start);
+  Eigen::Affine3d desired_flange_pose_wrt_torso= fwd_kin_flange_wrt_torso_solve(q_start);
   
     //std::vector<std::vector<Eigen::VectorXd> > path_options; 
-  Eigen::Affine3d   desired_hand_pose_wrt_rarm_mount=Affine_torso_to_rarm_mount.inverse()*desired_hand_pose_wrt_torso; //related to torso via static transforms 
-  Eigen::Matrix3d   Rdes = desired_hand_pose_wrt_rarm_mount.linear();
-  //double q_s0_ctr = compute_qs0_ctr(desired_hand_pose_wrt_rarm_mount);
+  Eigen::Affine3d   desired_flange_pose_wrt_rarm_mount=Affine_torso_to_rarm_mount_.inverse()*desired_flange_pose_wrt_torso; //related to torso via static transforms 
+  Eigen::Matrix3d   Rdes = desired_flange_pose_wrt_rarm_mount.linear();
+  //double q_s0_ctr = compute_qs0_ctr(desired_flange_pose_wrt_rarm_mount);
   double dqs0 = DQS0; // search resolution on dq0
   double q_s0= q_start[0]; //q_s0_ctr;
 
@@ -878,7 +878,7 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_
   while (reachable) { 
         q_s0+= dqs0;
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_hand_pose_wrt_torso,q_s0, q_solns_of_qs0);
+        nsolns =ik_solve_approx_wrt_torso_given_qs0(desired_flange_pose_wrt_torso,q_s0, q_solns_of_qs0);
         if (nsolns==0) reachable=false;
         if (reachable ) {
                  single_layer_nodes.clear();            
@@ -894,19 +894,19 @@ int Baxter_IK_solver::ik_solve_approx_elbow_orbit_plus_qdot_s0_from_flange_pose_
     return path_options.size(); // should be number of q_s0 samples
 }
 
-//function to find precise values of joint angles q1, q2, q3 to match desired wrist position, implied by desired_hand_pose
+//function to find precise values of joint angles q1, q2, q3 to match desired wrist position, implied by desired_flange_pose
 //provide q123_approx; this function will take q_s0 and q_forearm as specified, and q_s1, q_humerus and q_elbow as approximated,
 // and will refine q_s1, q_humerus and q_elbow to attempt a precise fit to desired wrist position;
 // improved soln is returned in q123_precise
-// desired_hand_pose must be expressed w/rt right-arm mount frame (not torso frame)
-double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_hand_pose,Vectorq7x1 q123_approx, Vectorq7x1 &q123_precise) {
+// desired_flange_pose must be expressed w/rt right-arm mount frame (not torso frame)
+double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_flange_pose,Vectorq7x1 q123_approx, Vectorq7x1 &q123_precise) {
         double q_s0 = q123_approx[0];
 
         Eigen::Vector3d w_approx,w_err,dq123,wrist_pt_wrt_right_arm_frame1;
         Eigen::Matrix3d Jw3x3,Jw3x3_inv;
         //compute the desired wrist point, working backwards from desired hand frame
         //provide q_s0 in q123_approx, so this can be expressed w/rt frame1
-        wrist_pt_wrt_right_arm_frame1= wrist_pt_wrt_frame1_of_flange_des_and_qs0(desired_hand_pose,q123_approx);
+        wrist_pt_wrt_right_arm_frame1= wrist_pt_wrt_frame1_of_flange_des_and_qs0(desired_flange_pose,q123_approx);
         Jw3x3 = get_wrist_Jacobian_3x3(q123_approx[1], q123_approx[2], q123_approx[3], q123_approx[4]);          
         //cout<<"Jw3x3: "<<endl;
         //cout<<Jw3x3<<endl;
@@ -937,14 +937,14 @@ double  Baxter_IK_solver::precise_soln_q123(Eigen::Affine3d const& desired_hand_
         return w_err_norm;
 }
 
-// assumes desired_hand_pose is expressed w/rt r_arm_mount
-double  Baxter_IK_solver::compute_qs0_ctr(Eigen::Affine3d const& desired_hand_pose)
+// assumes desired_flange_pose is expressed w/rt r_arm_mount
+double  Baxter_IK_solver::compute_qs0_ctr(Eigen::Affine3d const& desired_flange_pose)
 { 
     bool reachable = false;
     Eigen::Vector3d w_wrt_1; 
     Vectorq7x1 soln1_vec;
     soln1_vec(0)=0.0;
-    w_wrt_1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);
+    w_wrt_1 = wrist_frame1_from_flange_wrt_rarm_mount(desired_flange_pose,soln1_vec);
     //cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0=0 "<<w_wrt_1.transpose()<<endl;    
     double r_perp = sqrt(w_wrt_1(1)*w_wrt_1(1)+w_wrt_1(0)*w_wrt_1(0));
     double q_s0_ctr = atan2(w_wrt_1(2),r_perp);
@@ -952,9 +952,9 @@ double  Baxter_IK_solver::compute_qs0_ctr(Eigen::Affine3d const& desired_hand_po
     //cout<<"q_s0_ctr="<<q_s0_ctr<<endl;
     soln1_vec(0)=q_s0_ctr;
     
-    //reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns);    
+    //reachable = compute_q123_solns(desired_flange_pose, q_s0, q_solns);    
     //recompute w_wrt_1 using q_s0_ctr--intend for w_z = 0 at this pose
-    w_wrt_1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);   
+    w_wrt_1 = wrist_frame1_from_flange_wrt_rarm_mount(desired_flange_pose,soln1_vec);   
     //cout<<"compute_qs0_ctr: wrist pt wrt frame 1 at q_s0_ctr: "<<w_wrt_1.transpose()<<endl;
     
     return q_s0_ctr;
@@ -965,7 +965,7 @@ double  Baxter_IK_solver::compute_qs0_ctr(Eigen::Affine3d const& desired_hand_po
 // there will be 0, 1 or 2 solutions;
 // pack these into a 7x1 vector--just leave wrist DOFs =0 for now;
 // return "true" if at least 1 valid soln within joint ranges
-bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_pose, double q_s0, std::vector<Vectorq7x1> &q_solns)
+bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_flange_pose, double q_s0, std::vector<Vectorq7x1> &q_solns)
 { 
     q_solns.clear();
     Vectorq7x1 soln1_vec;
@@ -996,7 +996,7 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
     }   
 
     //given desired hand pose, compute the approximate wrist point coordinates, and express these w/rt frame 1 (s1 frame)
-    wrist_pt_wrt_right_arm_frame1 = wrist_frame1_from_tool_wrt_rarm_mount(desired_hand_pose,soln1_vec);
+    wrist_pt_wrt_right_arm_frame1 = wrist_frame1_from_flange_wrt_rarm_mount(desired_flange_pose,soln1_vec);
     //cout<< "compute_q123_solns: w w/rt frame1 from fwd kin code: "<<wrist_pt_wrt_right_arm_frame1.transpose()<<endl;    
     
     //solve for q_elbow;
@@ -1082,7 +1082,7 @@ bool Baxter_IK_solver::compute_q123_solns(Eigen::Affine3d const& desired_hand_po
 bool Baxter_IK_solver::solve_for_elbow_ang(Eigen::Vector3d w_wrt_1,double &q_elbow) {
     double r_goal = w_wrt_1.norm();
     //cout<<"r_goal: "<<r_goal<<endl;
-    double acos_arg = (L_humerus*L_humerus + L_forearm*L_forearm - r_goal*r_goal)/(2.0*L_humerus*L_forearm);
+    double acos_arg = (L_humerus_*L_humerus_ + L_forearm_*L_forearm_ - r_goal*r_goal)/(2.0*L_humerus_*L_forearm_);
     if ((fabs(acos_arg)>1.0)||(r_goal>r_goal_max)) {
         //ROS_WARN("solve_for_elbow_ang beyond safe reach;  acos_arg = %f; r_goal = %f",acos_arg,r_goal);
         return false;
@@ -1093,8 +1093,8 @@ bool Baxter_IK_solver::solve_for_elbow_ang(Eigen::Vector3d w_wrt_1,double &q_elb
     
     double q_elbow_nom = M_PI - eta; // 
     //cout<<"q_elbow_nom="<<q_elbow_nom<<endl;
-    q_elbow = q_elbow_nom+ phi_shoulder;  //this should be the viable solution
-    //q_elbow[1] = -q_elbow_nom + phi_shoulder;
+    q_elbow = q_elbow_nom+ phi_shoulder_;  //this should be the viable solution
+    //q_elbow[1] = -q_elbow_nom + phi_shoulder_;
     //cout<<"q_elbow = "<<q_elbow<<endl;
     /*
     ROS_INFO("test:");
@@ -1115,7 +1115,7 @@ bool Baxter_IK_solver::solve_for_elbow_ang(Eigen::Vector3d w_wrt_1,double &q_elb
 //given desired wrist point, w/rt frame 1, and given q_elbow, solve for q_humerus--2 solns
 bool Baxter_IK_solver::solve_for_humerus_ang(Eigen::Vector3d w_wrt_1,double q_elbow, double q_humerus[2]) {
     //moment arm of humerus rotation is elbow offset plus displacement of wrist due to elbow rotation
-    double r_arm = DH_a3 + sin(q_elbow)*L_forearm; // w/ bent elbow, will always be positive
+    double r_arm = DH_a3 + sin(q_elbow)*L_forearm_; // w/ bent elbow, will always be positive
     double z_offset = w_wrt_1(2);
 
     //ROS_INFO("z_offset des = %f; r_arm = %f",z_offset,r_arm);
@@ -1150,7 +1150,7 @@ bool Baxter_IK_solver::solve_for_s1_ang(Eigen::Vector3d w_wrt_1,double q_elbow, 
    //moment arm of humerus rotation is elbow offset plus displacement of wrist due to elbow rotation
     double r_reach = w_wrt_1.norm(); //dist from frame-1 origin to wrist point
     // perpendicular radius from z3 to w is r_perp
-    double r_perp = DH_a3 + sin(q_elbow)*L_forearm; // w/ bent elbow, will always be positive
+    double r_perp = DH_a3 + sin(q_elbow)*L_forearm_; // w/ bent elbow, will always be positive
     double Lw_sqd = r_reach*r_reach - r_perp*r_perp; //compute distance along z3 from O1 to w
 
     if (Lw_sqd<0)
@@ -1240,7 +1240,7 @@ bool Baxter_IK_solver::solve_spherical_wrist(Vectorq7x1 q_in,Eigen::Matrix3d R_d
     //A23 = compute_A_of_DH(2, q_in[2]);
     //A03 = A01*A12*A23;  
     fwd_kin_solve_(q_in);
-    A04 = A_mat_products[3];
+    A04 = A_mat_products_[3];
     Eigen::Vector3d n6,t6,b6; //axes of frame6; b6 is same as b_des
     Eigen::Vector3d n5,t5,b5; // axes of frame5;    
     Eigen::Vector3d n4,t4,b4; // axes of frame4
@@ -1367,13 +1367,13 @@ bool Baxter_IK_solver::update_spherical_wrist(Vectorq7x1 q_in,Eigen::Matrix3d R_
 }
 
 //this fnc requires a good, 7dof approximate soln for q_in 
-// assumes Eigen::Affine3d const& desired_hand_pose is expressed w/rt right-arm mount frame (not torso frame)
+// assumes Eigen::Affine3d const& desired_flange_pose is expressed w/rt right-arm mount frame (not torso frame)
 // returns an improved 7dof soln in q_7dof_precise
-bool Baxter_IK_solver::improve_7dof_soln(Eigen::Affine3d const& desired_hand_pose_wrt_arm_mount, Vectorq7x1 q_in, Vectorq7x1 &q_7dof_precise) {
-    Eigen::Matrix3d R_flange_wrt_right_arm_mount = desired_hand_pose_wrt_arm_mount.linear();
+bool Baxter_IK_solver::improve_7dof_soln(Eigen::Affine3d const& desired_flange_pose_wrt_arm_mount, Vectorq7x1 q_in, Vectorq7x1 &q_7dof_precise) {
+    Eigen::Matrix3d R_flange_wrt_right_arm_mount = desired_flange_pose_wrt_arm_mount.linear();
     Vectorq7x1 q123_precise;
     
-    double w_err_norm= precise_soln_q123(desired_hand_pose_wrt_arm_mount,q_in, q123_precise);
+    double w_err_norm= precise_soln_q123(desired_flange_pose_wrt_arm_mount,q_in, q123_precise);
     bool valid = update_spherical_wrist(q123_precise,R_flange_wrt_right_arm_mount, q_7dof_precise);
     return valid;
 }

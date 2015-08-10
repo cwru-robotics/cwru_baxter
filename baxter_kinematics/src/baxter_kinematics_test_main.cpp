@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
         //if (reachable_proposition) 
         {
 
-            Eigen::Affine3d A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_in); //fwd_kin_solve
+            Eigen::Affine3d A_fwd_DH = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_in); //fwd_kin_solve
             // rotate DH frame6 to reconcile with URDF frame7:
             //Eigen::Affine3d A_fwd_URDF = A_fwd_DH*a_tool;
             //std::cout << "q_in: " << q_in.transpose() << std::endl;

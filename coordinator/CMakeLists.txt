@@ -20,6 +20,7 @@ catkin_simple()
 
 # Executables
 cs_add_executable(coordinator src/coordinator.cpp)
+cs_add_executable(test_get_model_frame src/test_get_model_frame.cpp)
 # target_link_library(example my_lib)
 
 cs_install()

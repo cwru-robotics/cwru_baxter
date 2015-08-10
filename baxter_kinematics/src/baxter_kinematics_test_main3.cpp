@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
         cout<<"qvec right arm: "<<endl;
         cout<< q_snapshot.transpose() <<endl;
         // from this test pose, establish a viable hand frame:
-    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_solve_wrt_torso(q_snapshot); //fwd_kin_solve
+    Eigen::Affine3d Affine_flange_wrt_torso = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_snapshot); //fwd_kin_solve
     
     Eigen::Affine3d Affine_flange_wrt_arm_mount = 
             baxter_fwd_solver.transform_affine_from_torso_frame_to_arm_mount_frame(Affine_flange_wrt_torso);
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
         cout<<"qvec right arm: "<<endl;
         cout<< q_snapshot.transpose() <<endl;
         // from this test pose, establish a viable hand frame:
-        A_fwd_DH = baxter_fwd_solver.fwd_kin_solve(q_snapshot); //fwd_kin_solve
+        A_fwd_DH = baxter_fwd_solver.fwd_kin_flange_wrt_r_arm_mount_solve(q_snapshot); //fwd_kin_solve
 
         cout<<"TRYING NEW FNC ik_solve_approx"<<endl;
         nsolns = baxter_IK_solver.ik_solve_approx(A_fwd_DH,q_solns);

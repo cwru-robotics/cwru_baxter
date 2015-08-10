@@ -16,24 +16,36 @@ CartTrajPlanner::CartTrajPlanner() // optionally w/ args, e.g.
     R_gripper_down_.col(0) = n_des_;
     R_gripper_down_.col(1) = t_des_;
     R_gripper_down_.col(2) = b_des_;
+    
+    // define a fixed orientation corresponding to horizontal tool normal, 
+    //  vector between fingers also horizontal
+    // right-hand gripper approach direction along y axis
+    // useful, e.g. for picking up a bottle to be poured
+    tool_n_des_horiz_<<1,0,0;
+    tool_b_des_horiz_<<0,1,0;
+    tool_t_des_horiz_ = tool_b_des_horiz_.cross(tool_n_des_horiz_);
+    R_gripper_horiz_.col(0) = tool_n_des_horiz_;
+    R_gripper_horiz_.col(1) = tool_t_des_horiz_;
+    R_gripper_horiz_.col(2) = tool_b_des_horiz_;    
 }
 
+
 //specify start and end poses w/rt torso.  Only orientation of end pose will be considered; orientation of start pose is ignored
-bool CartTrajPlanner::cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen::Affine3d a_tool_end, std::vector<Eigen::VectorXd> &optimal_path) {
+bool CartTrajPlanner::cartesian_path_planner(Eigen::Affine3d a_flange_start,Eigen::Affine3d a_flange_end, std::vector<Eigen::VectorXd> &optimal_path) {
     std::vector<std::vector<Eigen::VectorXd> > path_options;
     path_options.clear();
     std::vector<Eigen::VectorXd> single_layer_nodes;
     Eigen::VectorXd node;
-    Eigen::Affine3d a_tool_des;
-    Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_des.linear() = R_des;
+    Eigen::Affine3d a_flange_des;
+    Eigen::Matrix3d R_des = a_flange_end.linear();
+    a_flange_des.linear() = R_des;
 
     int nsolns;
     bool reachable_proposition;
     int nsteps = 0;
     Eigen::Vector3d p_des,dp_vec,del_p,p_start,p_end;
-    p_start = a_tool_start.translation();
-    p_end = a_tool_end.translation();
+    p_start = a_flange_start.translation();
+    p_end = a_flange_end.translation();
     del_p = p_end-p_start;
     double dp_scaler = 0.05;
     nsteps = round(del_p.norm()/dp_scaler);
@@ -47,9 +59,9 @@ bool CartTrajPlanner::cartesian_path_planner(Eigen::Affine3d a_tool_start,Eigen:
 
     for (int istep=0;istep<nsteps;istep++) 
     {
-            a_tool_des.translation() = p_des;
+            a_flange_des.translation() = p_des;
             cout<<"trying: "<<p_des.transpose()<<endl;
-            nsolns = baxter_IK_solver_.ik_solve_approx_wrt_torso(a_tool_des, q_solns);
+            nsolns = baxter_IK_solver_.ik_solve_approx_wrt_torso(a_flange_des, q_solns);
             std::cout<<"nsolns = "<<nsolns<<endl;
             single_layer_nodes.clear();
             if (nsolns>0) {
@@ -108,7 +120,7 @@ bool CartTrajPlanner::cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d 
     Eigen::VectorXd node;
     Eigen::Affine3d a_tool_des,a_tool_start;
     Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_start = baxter_fwd_solver_.fwd_kin_solve_wrt_torso(q_start);
+    a_tool_start = baxter_fwd_solver_.fwd_kin_flange_wrt_torso_solve(q_start);
     cout<<"fwd kin from q_start: "<<a_tool_start.translation().transpose()<<endl;
     cout<<"fwd kin from q_start R: "<<endl;
     cout<<a_tool_start.linear()<<endl;
@@ -209,7 +221,7 @@ bool CartTrajPlanner::cartesian_path_planner_delta_p(Vectorq7x1 q_start, Eigen::
     Eigen::Affine3d a_tool_des,a_tool_start,a_tool_end;
     Eigen::Vector3d p_des,dp_vec,del_p,p_start,p_end;
 
-    a_tool_start = baxter_fwd_solver_.fwd_kin_solve_wrt_torso(q_start);
+    a_tool_start = baxter_fwd_solver_.fwd_kin_flange_wrt_torso_solve(q_start);
     Eigen::Matrix3d R_des = a_tool_start.linear();    
     p_des = a_tool_start.translation();
     cout<<"fwd kin from q_start p: "<<p_des.transpose()<<endl;
@@ -315,7 +327,7 @@ bool CartTrajPlanner::cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Aff
     Eigen::VectorXd node;
     Eigen::Affine3d a_tool_des,a_tool_start;
     Eigen::Matrix3d R_des = a_tool_end.linear();
-    a_tool_start = baxter_fwd_solver_.fwd_kin_solve_wrt_torso(q_start);
+    a_tool_start = baxter_fwd_solver_.fwd_kin_flange_wrt_torso_solve(q_start);
     cout<<"fwd kin from q_start: "<<a_tool_start.translation().transpose()<<endl;
     cout<<"fwd kin from q_start R: "<<endl;
     cout<<a_tool_start.linear()<<endl;
@@ -430,6 +442,6 @@ bool CartTrajPlanner::cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Aff
 // use this classes baxter fk solver to compute and return tool-flange pose w/rt torso, given right-arm joint angles
 Eigen::Affine3d CartTrajPlanner::get_fk_Affine_from_qvec(Vectorq7x1 q_vec) {
     Eigen::Affine3d Affine_pose;
-    Affine_pose = baxter_fwd_solver_.fwd_kin_solve_wrt_torso(q_vec);
+    Affine_pose = baxter_fwd_solver_.fwd_kin_flange_wrt_torso_solve(q_vec);
     
 }
