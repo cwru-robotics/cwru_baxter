@@ -209,7 +209,7 @@ void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj
     } else { //OK...have a valid trajectory goal; execute it
         //got_new_goal = true;
         //got_new_trajectory = true;
-        ROS_WARN("Cb received traj w/ npts = %d",npts);
+        ROS_INFO("Cb received traj w/ npts = %d",npts);
         //cout << "Cb received traj w/ npts = " << new_trajectory.points.size() << endl;
         //trajectory_msgs::JointTrajectoryPoint trajectory_point0;
         //trajectory_point0 = new_trajectory.points[0];  

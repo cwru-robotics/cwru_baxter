@@ -54,7 +54,7 @@ DH=[
 //TOOL TRANSFORM params, right hand
 const double Lx_hand = -0.03;
 const double Lz_hand = 0.120;
-const double theta_yaw_hand= -0.2;
+const double theta_yaw_hand= -0.24;
 
 // these values for RIGHT ARM
 const double DH_a1=0.069;

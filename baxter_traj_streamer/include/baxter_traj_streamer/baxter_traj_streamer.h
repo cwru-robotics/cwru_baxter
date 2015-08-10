@@ -30,7 +30,7 @@ const double q3dotmax = 0.5;
 const double q4dotmax = 1;
 const double q5dotmax = 1;
 const double q6dotmax = 1;
-const double dt_traj = 0.01; // time step for trajectory interpolation
+const double dt_traj = 0.02; // time step for trajectory interpolation
 
 
 

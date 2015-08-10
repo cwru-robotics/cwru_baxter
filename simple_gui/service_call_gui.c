@@ -145,7 +145,7 @@ G_MODULE_EXPORT void open_gripper_cb(GtkButton *open_gripper, gpointer data)
 G_MODULE_EXPORT void close_gripper_cb(GtkButton *close_gripper, gpointer data) 
 {
   printf("closing gripper\n");
-  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -0.1"); // angle 90deg rot of motor; should be OK to pick up can
+  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -1.1"); // angle 90deg rot of motor; should be OK to pick up can
 }
 
 

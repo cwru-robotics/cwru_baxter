@@ -27,7 +27,7 @@
 #include <tf/LinearMath/Vector3.h>
 #include <tf/LinearMath/QuadWord.h>
 
-const double H_CYLINDER = 0.24; // estimated height of cylinder
+const double H_CYLINDER = 0.12; // estimated height of cylinder; reconcile this w/ perception module const
 
 using namespace std;
 
@@ -367,7 +367,7 @@ int main(int argc, char **argv) {
                     ROS_INFO("case RQST_COMPUTE_MOVE_ARM_DEPART; doing nothing!");
                     arm_server_busy_wait_done();
                     break;
-                case RQST_COMPUTE_MOVE_ARM_TO_MARKER: //misonomer--this is a request to compute a plan
+                case RQST_COMPUTE_MOVE_ARM_TO_MARKER: //misnomer--this is a request to compute a plan
                     ROS_INFO("RQST_COMPUTE_MOVE_ARM_TO_MARKER: planning move to marker pose");
                     IM_6dof_srv_msg.request.cmd_mode = IM_GET_CURRENT_MARKER_POSE;
                     status = IM_6dof_svc_client.call(IM_6dof_srv_msg);

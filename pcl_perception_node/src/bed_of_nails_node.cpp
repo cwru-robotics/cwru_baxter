@@ -946,6 +946,8 @@ int main(int argc, char** argv) {
     ros::ServiceServer frame_service = nh.advertiseService("pcl_getframe_svc", getFrameService);
     std::vector<int> indices_pts_above_plane;
 
+    // init display cloud header--just so Rviz will be happy until a genuine display cloud is populated
+    g_display_cloud->header = g_pclKinect->header;
 /*
     if (pcl::io::loadPCDFile<pcl::PointXYZ> ("test_pcd.pcd", *g_cloud_from_disk) == -1) //* load the file
     {
