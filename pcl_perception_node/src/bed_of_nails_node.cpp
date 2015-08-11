@@ -62,8 +62,7 @@ using namespace Eigen;
 using namespace pcl;
 using namespace pcl::io; 
 
-// shortcut for now...later, object_finder should be a library
-#include "object_finder.cpp"
+
 
 
 //#include <pcl_perception_node/pcl_perception_defs.h>
@@ -77,7 +76,9 @@ const int PCL_MAKE_CAN_CLOUD = 4;
 const int PCL_FIND_ON_TABLE = 5;
 const int PCL_TAKE_SNAPSHOT = 6;
 const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
-const int PCL_FIND_COKE_CAN_GRASPS_FROM_ABOVE = 8;
+const int PCL_FIND_COKE_FRAME = 8;
+
+const int PCL_FRAME_SVC_MODEL_GET_MODEL_FRAME_WRT_TORSO=2;
 
 
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
@@ -97,7 +98,8 @@ const double y_view_min=-0.2;
 const double y_view_max=0.2;
 const int silhouette_size = 128; //set chosen resolution for sampling "bed of nails"
 
-const double default_table_z_height_wrt_baxter_base_frame = -0.2; // replace this with data from perception...later
+const double default_table_z_height_wrt_baxter_base_frame = -0.213; // experimentally, this is height of stool relative to baxter frame;
+                                                                    // OK for default, but more generally, replace this with data from perception in calls to find objects
 
 
 
@@ -168,7 +170,8 @@ Eigen::Vector3f g_plane_origin;
 Eigen::Vector3f g_base_origin;
 
 Eigen::Vector3f g_patch_origin;
-Eigen::Affine3f g_A_plane,g_A_model;
+Eigen::Affine3f g_A_plane,g_A_model,g_A_model_wrt_base;
+Eigen::Affine3d g_A3d_model;
 Eigen::Affine3f g_affine_kinect_to_base;
 double g_z_plane_nom;
 double g_table_z_wrt_base;
@@ -179,6 +182,30 @@ std::vector<int> g_indices_of_plane; //indices of patch that do not contain outl
 //		const tf::Transform &  	transform 
 //	) 	
 tf::Transform g_tf_kinect_sensor_to_base_link;
+
+// shortcut for now...later, object_finder should be a library
+#include "object_finder.cpp"
+
+Eigen::Affine3f eigen_affine_3d_to_3f(Eigen::Affine3d affine3d) {
+    Eigen::Vector3f origin3f;
+    Eigen::Vector3d origin3d;
+    Eigen::Matrix3f R3f;
+    Eigen::Matrix3d R3d;
+    Eigen::Affine3f affine3f;
+    origin3d = affine3d.translation();
+    R3d = affine3d.linear();
+    for (int i=0;i<3;i++) {
+        origin3f(i) = origin3d(i);
+    }
+    for (int i=0;i<3;i++) 
+      for (int j=0;j<3;j++) {
+          R3f(i,j) = R3d(i,j);
+      }     
+    affine3f.translation() = origin3f;
+    affine3f.linear() = R3f;
+    return affine3f;
+}
+
 
   void transformTFToEigen(const tf::Transform &t, Eigen::Affine3f &e)
   {
@@ -194,8 +221,46 @@ tf::Transform g_tf_kinect_sensor_to_base_link;
     for (int col = 0 ; col < 3; col ++)
       e.matrix()(3, col) = 0;
     e.matrix()(3,3) = 1;
-  };
+}
 
+void  transformEigenAffine3fToPose(Eigen::Affine3f e, geometry_msgs::Pose &pose) {
+    Eigen::Vector3f Oe;
+    Eigen::Matrix3f Re;
+    Oe = e.translation();
+    Re = e.linear();   
+
+    Quaternionf q(Re); // convert rotation matrix Re to a quaternion, q
+    pose.position.x = Oe(0);
+    pose.position.y = Oe(1);
+    pose.position.z = Oe(2);    
+    
+    pose.orientation.x = q.x();
+    pose.orientation.y = q.y();
+    pose.orientation.z = q.z();
+    pose.orientation.w = q.w();   
+  }
+
+//UNTESTED!!
+void transformEigenAffine3fToTF(Eigen::Affine3f e, tf::Transform &t) {
+    tf::Matrix3x3 Rtf;
+    tf::Vector3 Otf;
+    Eigen::Vector3f Oe;
+    Eigen::Matrix3f Re;
+    Oe = e.translation();
+    Re = e.linear();
+    for (int i = 0; i < 3; i++) {
+        Otf[i] = Oe[i];
+    }
+    t.setOrigin(Otf);
+
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) {
+            Rtf[i][j] = Re(i, j);
+        }
+    t.setBasis(Rtf);
+    // need to do something with header...
+}
+  
 /**/
 void display_pts(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud, std::vector<int>iselect) {
     Eigen::Vector3f pt;
@@ -323,10 +388,10 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     
     int npts_selected = g_cloud_transformed->width * g_cloud_transformed->height;
     cout<<"transformed "<<npts_selected<<" points from selection"<<endl;
-    for (int i = 0; i < npts_selected; ++i) {
-        selected_pt = g_cloud_transformed->points[i].getVector3fMap();
-        cout<<selected_pt.transpose()<<endl;
-    }        
+    //for (int i = 0; i < npts_selected; ++i) {
+    //    selected_pt = g_cloud_transformed->points[i].getVector3fMap();
+    //    cout<<selected_pt.transpose()<<endl;
+    //}        
     
     // use the following to transform kinect points into the plane frame; could do translation as well, but not done here
     //Eigen::Matrix3f R_transpose = g_R_transform.transpose();
@@ -825,39 +890,53 @@ bool modeService(cwru_srv::simple_int_service_messageRequest& request, cwru_srv:
     return true;
 }
 
-bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv::IM_node_service_messageResponse& response ) {
+bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv::IM_node_service_messageResponse& response) {
     ROS_INFO("pcl_perception_node: received request for frame");
-    //if pay attention to input codes, could choose what frame to return
-    // by default, return the frame of the model (can)
-    cout<<"model frame origin (w/rt sensor frame)"<<g_A_model.translation().transpose()<<endl;
-    cout<<"model frame orientation: "<<endl;
-    cout<<g_A_model.linear()<<endl;
     geometry_msgs::Pose pose;
     geometry_msgs::PoseStamped poseStamped;
-    //tf::poseEigenToMsg 	(g_A_model,pose);
+    //if pay attention to input codes, could choose what frame to return
+    // by default, return the frame of the model (can)
+    if (PCL_FRAME_SVC_MODEL_GET_MODEL_FRAME_WRT_TORSO == request.cmd_mode) {
+        ROS_INFO("requesting model pose w/rt torso");
+        transformEigenAffine3fToPose(g_A_model_wrt_base, pose);
+        ROS_INFO("model pose origin: %f, %f, %f",pose.position.x,pose.position.y,pose.position.z);
+        ROS_INFO("model pose quat: %f, %f, %f, %f",pose.orientation.x,pose.orientation.y,pose.orientation.z,pose.orientation.w);
     
-    Eigen::Quaternionf quat(g_A_model.linear());
-    Eigen::Vector3f origin(g_A_model.translation());
-    //origin = g_A_model.translation();    
-    //quat = g_A_model.linear();
-    ROS_INFO("quaternion: %f, %f, %f, %f", quat.x(),quat.y(),quat.z(),quat.w());
-    //ROS_INFO("origin...");
-    cout<<"origin: "<<origin.transpose()<<endl; 
-    //cout<<"quaternion: "<<quat<<endl;
-    poseStamped.pose.orientation.x =  quat.x();
-    poseStamped.pose.orientation.y =  quat.y();    
-    poseStamped.pose.orientation.z =  quat.z();
-    poseStamped.pose.orientation.w =  quat.w();
+        poseStamped.pose = pose;
+        poseStamped.header.stamp = ros::Time().now();
+        poseStamped.header.frame_id = "torso"; // this mode assumes affine is w/rt torso
+    } else {
 
-    poseStamped.pose.position.x = origin[0];
-    poseStamped.pose.position.y = origin[1];
-    poseStamped.pose.position.z = origin[2]; 
-    poseStamped.header.stamp = ros::Time().now();
-    poseStamped.header.frame_id = "camera_rgb_optical_frame"; // had to change topic for physical kinect; kinect_pc_frame";
-    // need to convert this frame to a poseStamped and put into response
-    response.poseStamped_IM_current = poseStamped;
+        cout << "model frame origin: " << g_A_model.translation().transpose() << endl;
+        cout << "model frame orientation: " << endl;
+        cout << g_A_model.linear() << endl;
+
+        //tf::poseEigenToMsg 	(g_A_model,pose);
+
+        Eigen::Quaternionf quat(g_A_model.linear());
+        Eigen::Vector3f origin(g_A_model.translation());
+        //origin = g_A_model.translation();    
+        //quat = g_A_model.linear();
+        ROS_INFO("quaternion: %f, %f, %f, %f", quat.x(), quat.y(), quat.z(), quat.w());
+        //ROS_INFO("origin...");
+        cout << "origin: " << origin.transpose() << endl;
+        //cout<<"quaternion: "<<quat<<endl;
+        poseStamped.pose.orientation.x = quat.x();
+        poseStamped.pose.orientation.y = quat.y();
+        poseStamped.pose.orientation.z = quat.z();
+        poseStamped.pose.orientation.w = quat.w();
+
+        poseStamped.pose.position.x = origin[0];
+        poseStamped.pose.position.y = origin[1];
+        poseStamped.pose.position.z = origin[2];
+        poseStamped.header.stamp = ros::Time().now();
+        poseStamped.header.frame_id = "camera_rgb_optical_frame"; // had to change topic for physical kinect; kinect_pc_frame";
+        // need to convert this frame to a poseStamped and put into response
+        response.poseStamped_IM_current = poseStamped;
+    }
     return true;
 }
+
 
 // this callback wakes up when a new "selected Points" message arrives
 void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
@@ -977,10 +1056,10 @@ int main(int argc, char** argv) {
     Eigen::Vector3f can_center_wrt_plane;
     Eigen::Vector3f height_delta_wrt_sensor_frame;
     Eigen::Affine3f A_plane_to_sensor;
-    std::vector<Eigen::Affine3d> grasp_xforms;
-    Eigen::Vector3d grasp_frame_origin;
-    Eigen::Matrix3d grasp_frame_R;
-    Eigen::Affine3d affine_grasp_frame_wrt_baxter_base;
+    //std::vector<Eigen::Affine3d> grasp_xforms;
+    Eigen::Vector3d model_frame_origin;
+    Eigen::Matrix3d model_frame_R;
+    Eigen::Affine3d affine_model_frame_wrt_baxter_base;
     int n_grasp_frames;
     //cout<<"enter 1 to start loop: ";
     //cin>>ans;
@@ -1099,20 +1178,16 @@ int main(int argc, char** argv) {
                      find_bounding_box(g_cloud_transformed, indices_pts_above_plane,x_min,x_max,y_min,y_max,z_min,z_max);
                     break;
                     
-                case PCL_FIND_COKE_CAN_GRASPS_FROM_ABOVE:
-                    object_finder.find_coke_can_grasps_from_above(g_cloud_wrt_base, default_table_z_height_wrt_baxter_base_frame, grasp_xforms);
-                    n_grasp_frames = grasp_xforms.size();
-                    cout<<"returned "<<n_grasp_frames<<" grasp frames"<<endl;
-                    for (int i=0;i<n_grasp_frames;i++) {
-                        affine_grasp_frame_wrt_baxter_base = grasp_xforms[i];
-                        grasp_frame_origin= affine_grasp_frame_wrt_baxter_base.translation();
-                        grasp_frame_R=affine_grasp_frame_wrt_baxter_base.linear();
-                        cout<<"frame "<<i<<" grasp frame origin: "<<grasp_frame_origin.transpose()<<endl;
-                        cout<<"R = "<<endl;
-                        cout<<grasp_frame_R<<endl;
-                    }
+                case PCL_FIND_COKE_FRAME:
+                    affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base,default_table_z_height_wrt_baxter_base_frame);
                     
-
+                    // debug output:
+                    model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
+                    ROS_INFO("coke can model frame w/rt base: %f, %f, %f \n ",model_frame_origin(0),model_frame_origin(1),model_frame_origin(2));               
+                    cout<<"R = "<<endl;
+                    cout<<affine_model_frame_wrt_baxter_base.linear()<<endl;
+                    g_A_model_wrt_base=eigen_affine_3d_to_3f(affine_model_frame_wrt_baxter_base); // this value will be available for service to report out
+                    
                 break;
 
                 case PCL_FIND_ON_TABLE:

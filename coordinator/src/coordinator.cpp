@@ -27,6 +27,8 @@
 #include <tf/LinearMath/Vector3.h>
 #include <tf/LinearMath/QuadWord.h>
 
+#include "object_grasp_frame_computer.cpp"  // shortcut for now--move this to a library in future
+
 const double H_CYLINDER = 0.12; // estimated height of cylinder; reconcile this w/ perception module const
 
 using namespace std;
@@ -41,6 +43,7 @@ const int IM_SET_NEW_MARKER_POSE= 1;
 //command codes for reachability node--only 1 action at present, so only need to provide z-height value
 cwru_srv::simple_float_service_message reachability_msg;
 
+cwru_srv::simple_int_service_message pcl_perception_msg;
 
 
 //incoming command codes for this coordinator service:
@@ -58,6 +61,8 @@ const int RQST_ASCEND_20CM=10;
 
 const int RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE = 11;
 const int RQST_PREVIEW_TRAJECTORY=12;
+
+const int RQST_GRAB_COKE_CAN_FROM_ABOVE=13;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -101,12 +106,15 @@ const int ARM_RECEIVED_AND_COMPLETED_RQST=5;
 const int ARM_PATH_IS_VALID=6;
 const int ARM_PATH_NOT_VALID=7;
 
+const int PCL_FIND_COKE_FRAME = 8;
+
 
 bool g_trigger = false;
 int g_coordinator_mode = RQST_DO_NOTHING;
 
 tf::TransformListener *g_tfListener_ptr; //pointer to a global transform listener
 ros::ServiceClient g_pcl_getframe_svc_client; //global service to talk to pcl
+ros::ServiceClient g_pcl_perception_svc_client; //2nd PCL service
 ros::ServiceClient g_arm_interface_svc_client;
 
 //use this service to set processing modes interactively
@@ -122,43 +130,43 @@ bool coordinatorService(cwru_srv::simple_int_service_messageRequest& request, cw
     return true;
 }
 
-geometry_msgs::PoseStamped get_model_pose_wrt_torso() {
-geometry_msgs::PoseStamped poseStamped;
-    
-                    ROS_INFO("requesting model pose from pcl_perception: ");
-                    pcl_getframe_msg.request.cmd_mode = 1; // not really used yet...service always assumes you want the model frame, in kinect_pc_frame coords
-                    bool status = g_pcl_getframe_svc_client.call(pcl_getframe_msg);
-                    geometry_msgs::PoseStamped pose_from_pcl, pose_wrt_torso;
-                    pose_from_pcl = pcl_getframe_msg.response.poseStamped_IM_current;
-                    ROS_INFO("got current model pose: x,y,z = %f, %f, %f",
-                            pose_from_pcl.pose.position.x,
-                            pose_from_pcl.pose.position.y,
-                            pose_from_pcl.pose.position.z);
-                    ROS_INFO("quaternion is: %f, %f, %f, %f",
-                            pose_from_pcl.pose.orientation.x,
-                            pose_from_pcl.pose.orientation.y,
-                            pose_from_pcl.pose.orientation.z,
-                            pose_from_pcl.pose.orientation.w);
+geometry_msgs::PoseStamped get_model_pose_wrt_torso(int cmd_mode) {
+    geometry_msgs::PoseStamped poseStamped;
 
-                    // need to transform this into torso coords:
-                    /*
-                    tf::Vector3 pos = tf_kinect_wrt_torso.getOrigin();
-                    tf::Quaternion tf_quaternion = tf_kinect_wrt_torso.getRotation();
+    ROS_INFO("requesting model pose from pcl_perception: ");
+    pcl_getframe_msg.request.cmd_mode = cmd_mode; // modes 1 or 2: frame in kinect coords (1) or torso (2)
+    bool status = g_pcl_getframe_svc_client.call(pcl_getframe_msg);
+    geometry_msgs::PoseStamped pose_from_pcl, pose_wrt_torso;
+    pose_from_pcl = pcl_getframe_msg.response.poseStamped_IM_current;
+    ROS_INFO("got current model pose: x,y,z = %f, %f, %f",
+            pose_from_pcl.pose.position.x,
+            pose_from_pcl.pose.position.y,
+            pose_from_pcl.pose.position.z);
+    ROS_INFO("quaternion is: %f, %f, %f, %f",
+            pose_from_pcl.pose.orientation.x,
+            pose_from_pcl.pose.orientation.y,
+            pose_from_pcl.pose.orientation.z,
+            pose_from_pcl.pose.orientation.w);
 
-                    quaternion.x = tf_quaternion.x();
-                    quaternion.y = tf_quaternion.y();
-                    quaternion.z = tf_quaternion.z();
-                    quaternion.w = tf_quaternion.w();
-                    ROS_INFO("transform components: ");
-                    ROS_INFO("x,y, z = %f, %f, %f", pos[0], pos[1], pos[2]);
-                    ROS_INFO("q x,y,z,w: %f %f %f %f", quaternion.x, quaternion.y, quaternion.z, quaternion.w);
-                     * */
-                    g_tfListener_ptr->transformPose("torso", pose_from_pcl, pose_wrt_torso);
-                    ROS_INFO("model pose w/rt torso: ");
-                    ROS_INFO("origin: %f, %f, %f", pose_wrt_torso.pose.position.x, pose_wrt_torso.pose.position.y, pose_wrt_torso.pose.position.z);
-                    ROS_INFO("orientation: %f, %f, %f, %f", pose_wrt_torso.pose.orientation.x, pose_wrt_torso.pose.orientation.y, pose_wrt_torso.pose.orientation.z, pose_wrt_torso.pose.orientation.w);
-                    return pose_wrt_torso;
-    
+    // need to transform this into torso coords:
+    /*
+    tf::Vector3 pos = tf_kinect_wrt_torso.getOrigin();
+    tf::Quaternion tf_quaternion = tf_kinect_wrt_torso.getRotation();
+
+    quaternion.x = tf_quaternion.x();
+    quaternion.y = tf_quaternion.y();
+    quaternion.z = tf_quaternion.z();
+    quaternion.w = tf_quaternion.w();
+    ROS_INFO("transform components: ");
+    ROS_INFO("x,y, z = %f, %f, %f", pos[0], pos[1], pos[2]);
+    ROS_INFO("q x,y,z,w: %f %f %f %f", quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+     * */
+    g_tfListener_ptr->transformPose("torso", pose_from_pcl, pose_wrt_torso);
+    ROS_INFO("model pose w/rt torso: ");
+    ROS_INFO("origin: %f, %f, %f", pose_wrt_torso.pose.position.x, pose_wrt_torso.pose.position.y, pose_wrt_torso.pose.position.z);
+    ROS_INFO("orientation: %f, %f, %f, %f", pose_wrt_torso.pose.orientation.x, pose_wrt_torso.pose.orientation.y, pose_wrt_torso.pose.orientation.z, pose_wrt_torso.pose.orientation.w);
+    return pose_wrt_torso;
+
 }
 
 bool arm_server_busy_wait_done() {
@@ -223,6 +231,7 @@ int main(int argc, char **argv) {
     g_tfListener_ptr = &tfListener;
     
     tf::StampedTransform tf_kinect_wrt_torso;
+
     // wait to start receiving valid tf transforms 
     /**/
     bool tferr = true;
@@ -248,6 +257,7 @@ int main(int argc, char **argv) {
     ros::ServiceClient IM_6dof_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("IM6DofSvc");
     //ros::ServiceClient pcl_getframe_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("pcl_getframe_svc");
     g_pcl_getframe_svc_client= nh.serviceClient<cwru_srv::IM_node_service_message>("pcl_getframe_svc");
+    g_pcl_perception_svc_client= nh.serviceClient<cwru_srv::simple_int_service_message>("pcl_perception_svc");    
     //talk to the reachability node:
     ros::ServiceClient reachability_svc_client = nh.serviceClient<cwru_srv::simple_float_service_message>("compute_reachability_svc");
     // talk to arm interface:
@@ -255,6 +265,9 @@ int main(int argc, char **argv) {
     
     ros::ServiceServer service = nh.advertiseService("coordinator_svc", coordinatorService);
     double des_z_height=0.0;
+    
+    std::vector<Eigen::Affine3d> grasp_xforms; //vector to hold object grasp frame options    
+    Object_grasp_frame_computer object_grasp_frame_computer; // create a grasp-frame computer object
 
     bool wait_done=true;
     geometry_msgs::Quaternion quaternion;
@@ -268,7 +281,7 @@ int main(int argc, char **argv) {
                     break;
                 case RQST_MOVE_MARKER_TO_GRASP_POSE:
                     ROS_INFO("case MOVE_MARKER_TO_GRASP_POSE");                    
-                    model_pose_wrt_torso = get_model_pose_wrt_torso();
+                    model_pose_wrt_torso = get_model_pose_wrt_torso(1); // mode 1--model frame in Kinect coords
 
                     // put the marker origin at the top of the can:
                     pose = model_pose_wrt_torso.pose;
@@ -392,7 +405,11 @@ int main(int argc, char **argv) {
                         ROS_WARN("did not compute a valid path");
                     break;
                     /**/
-
+                case RQST_GRAB_COKE_CAN_FROM_ABOVE:
+                    pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;
+                    model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
+                    
+                    break;
                 default:
                     ROS_WARN("this mode is not implemented");
 

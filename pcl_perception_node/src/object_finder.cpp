@@ -15,8 +15,10 @@ public:
 
     // since multiple grasp frames may exist, a vector of transforms is filled;
     // these correspond to options for yale-hand grasp frames w/rt Baxter base frame
-    void find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height, std::vector<Eigen::Affine3d> &grasp_xforms);
-
+    
+    //oops--perception node should not be responsible for assigning grasp frames--only for identifying object frames
+    //void find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height, std::vector<Eigen::Affine3d> &grasp_xforms);
+    Eigen::Affine3d find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height);
     // add lots more special-purpose fncs here...
 
 private:
@@ -82,6 +84,9 @@ void Object_finder::box_filter(PointCloud<pcl::PointXYZ>::Ptr inputCloud, double
     }
     int n_extracted = indices.size();
     cout << " number of points extracted = " << n_extracted << endl;
+    
+    //FOR DEBUG:  this option will likely go away when g_pckKinect is inaccessible
+    copy_cloud(g_pclKinect, indices, g_display_cloud); //g_display_cloud is being published regularly by "main"
 }
 
 void Object_finder::fit_horizontal_circle_to_points(double template_radius, PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> indices, Eigen::Vector3d & model_frame_origin) {
@@ -98,7 +103,7 @@ void Object_finder::fit_horizontal_circle_to_points(double template_radius, Poin
     }
 }
 
-void Object_finder::find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height, std::vector<Eigen::Affine3d> &grasp_xforms) {
+Eigen::Affine3d Object_finder::find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height) {
     //coke can dimensions, per Kinect data
     const double RADIUS = 0.03; //estimated from ruler tool...example to fit a cylinder of this radius to data
     const double H_CYLINDER = 0.12; // estimated height of cylinder
@@ -109,14 +114,8 @@ void Object_finder::find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::P
     R << 1, 0, 0,
             0, 1, 0,
             0, 0, 1;
-    Eigen::Affine3d affine_model_frame_wrt_base, affine_grasp_wrt_base, grasp_frame_wrt_model_frame;
-    Eigen::Vector3d grasp_origin_wrt_model_origin;
-    grasp_origin_wrt_model_origin(0) = 0.0;
-    grasp_origin_wrt_model_origin(1) = 0.0;
-    grasp_origin_wrt_model_origin(2) = H_CYLINDER + GRASP_V_OFFSET;
-
-    grasp_frame_wrt_model_frame.linear() = R; // align gripper frame w/ model frame...many more options exist
-    grasp_frame_wrt_model_frame.translation() = grasp_origin_wrt_model_origin; // vertical offset for grasp from above
+    Eigen::Affine3d affine_model_frame_wrt_base;
+    
 
     vector<int> indices;
     Eigen::Vector3d model_frame_origin;
@@ -127,11 +126,24 @@ void Object_finder::find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::P
     // project these points to an x-y plane, then find a best fit of a circle of given radius to these points;
     //  fill in the x and y components
     fit_horizontal_circle_to_points(RADIUS, pt_cloud_wrt_base, indices, model_frame_origin);
-    model_frame_origin(2) = table_height; // coerce, if desired; coke can frame origin defined at base of can, i.e. at table height    
+    model_frame_origin(2) = table_height; // coke can frame origin defined at base of can, i.e. at table height    
     
     // represent this as an affine matrix
     affine_model_frame_wrt_base.linear() = R;
     affine_model_frame_wrt_base.translation() = model_frame_origin;
+
+    return affine_model_frame_wrt_base;
+    
+}
+
+/*
+    Eigen::Vector3d grasp_origin_wrt_model_origin;
+    grasp_origin_wrt_model_origin(0) = 0.0;
+    grasp_origin_wrt_model_origin(1) = 0.0;
+    grasp_origin_wrt_model_origin(2) = H_CYLINDER + GRASP_V_OFFSET;
+
+    grasp_frame_wrt_model_frame.linear() = R; // align gripper frame w/ model frame...many more options exist
+    grasp_frame_wrt_model_frame.translation() = grasp_origin_wrt_model_origin; // vertical offset for grasp from above
 
     // apply transform to get corresponding grasp frame:
     // sup{base}_A_sub{grasp} = sup{base}_A_sub{model}*sup{model}_A_sub{grasp}
@@ -140,7 +152,5 @@ void Object_finder::find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::P
     // could put in lots more options, but we'll just return this one option for now:
     grasp_xforms.clear();
     grasp_xforms.push_back(affine_grasp_wrt_base);
-
-}
-
+*/
 
