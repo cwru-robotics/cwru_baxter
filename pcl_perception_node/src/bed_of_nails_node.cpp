@@ -55,7 +55,15 @@
 
 #include <pcl_conversions/pcl_conversions.h>
 
-//clutching at straws here to find problem w/ pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+//typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
+
+using namespace std;
+using namespace Eigen;
+using namespace pcl;
+using namespace pcl::io; 
+
+// shortcut for now...later, object_finder should be a library
+#include "object_finder.cpp"
 
 
 //#include <pcl_perception_node/pcl_perception_defs.h>
@@ -69,7 +77,7 @@ const int PCL_MAKE_CAN_CLOUD = 4;
 const int PCL_FIND_ON_TABLE = 5;
 const int PCL_TAKE_SNAPSHOT = 6;
 const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
-
+const int PCL_FIND_COKE_CAN_GRASPS_FROM_ABOVE = 8;
 
 
 const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
@@ -89,12 +97,9 @@ const double y_view_min=-0.2;
 const double y_view_max=0.2;
 const int silhouette_size = 128; //set chosen resolution for sampling "bed of nails"
 
-//typedef pcl::PointCloud<pcl::PointXYZ> PointCloud; // can use this for short-hand
+const double default_table_z_height_wrt_baxter_base_frame = -0.2; // replace this with data from perception...later
 
-using namespace std;
-using namespace Eigen;
-using namespace pcl;
-using namespace pcl::io; 
+
 
 Eigen::Vector3f computeCentroid(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud);
 void computeRsqd(PointCloud<pcl::PointXYZ>::Ptr pcl_cloud, Eigen::Vector3f centroid, std::vector<float> &rsqd_vec);
@@ -961,7 +966,7 @@ int main(int argc, char** argv) {
     g_cloud_from_disk->header.frame_id = "world"; //kinect_pc_frame"; // why is this necessary?  Did PCD delete the reference frame id?
    */ 
     
-    
+    Object_finder object_finder;
     double z_threshold=0.0;
     double E;
     double dEdCx=0.0;
@@ -972,6 +977,11 @@ int main(int argc, char** argv) {
     Eigen::Vector3f can_center_wrt_plane;
     Eigen::Vector3f height_delta_wrt_sensor_frame;
     Eigen::Affine3f A_plane_to_sensor;
+    std::vector<Eigen::Affine3d> grasp_xforms;
+    Eigen::Vector3d grasp_frame_origin;
+    Eigen::Matrix3d grasp_frame_R;
+    Eigen::Affine3d affine_grasp_frame_wrt_baxter_base;
+    int n_grasp_frames;
     //cout<<"enter 1 to start loop: ";
     //cin>>ans;
             
@@ -1088,6 +1098,22 @@ int main(int argc, char** argv) {
                 case PCL_COMPUTE_Z_BED_OF_NAILS:
                      find_bounding_box(g_cloud_transformed, indices_pts_above_plane,x_min,x_max,y_min,y_max,z_min,z_max);
                     break;
+                    
+                case PCL_FIND_COKE_CAN_GRASPS_FROM_ABOVE:
+                    object_finder.find_coke_can_grasps_from_above(g_cloud_wrt_base, default_table_z_height_wrt_baxter_base_frame, grasp_xforms);
+                    n_grasp_frames = grasp_xforms.size();
+                    cout<<"returned "<<n_grasp_frames<<" grasp frames"<<endl;
+                    for (int i=0;i<n_grasp_frames;i++) {
+                        affine_grasp_frame_wrt_baxter_base = grasp_xforms[i];
+                        grasp_frame_origin= affine_grasp_frame_wrt_baxter_base.translation();
+                        grasp_frame_R=affine_grasp_frame_wrt_baxter_base.linear();
+                        cout<<"frame "<<i<<" grasp frame origin: "<<grasp_frame_origin.transpose()<<endl;
+                        cout<<"R = "<<endl;
+                        cout<<grasp_frame_R<<endl;
+                    }
+                    
+
+                break;
 
                 case PCL_FIND_ON_TABLE:
                     ROS_INFO("filtering for objects on most recently defined plane: not implemented yet");
