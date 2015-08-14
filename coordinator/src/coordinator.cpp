@@ -63,6 +63,7 @@ const int RQST_COMPUTE_MOVE_ARM_JSPACE_CURRENT_TO_PRE_POSE = 11;
 const int RQST_PREVIEW_TRAJECTORY=12;
 
 const int RQST_GRAB_COKE_CAN_FROM_ABOVE=13;
+const int RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE=14;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -107,7 +108,7 @@ const int ARM_PATH_IS_VALID=6;
 const int ARM_PATH_NOT_VALID=7;
 
 const int PCL_FIND_COKE_FRAME = 8;
-
+const int PCL_FIND_GAZEBO_BEER_FRAME = 9;
 
 bool g_trigger = false;
 int g_coordinator_mode = RQST_DO_NOTHING;
@@ -409,6 +410,12 @@ int main(int argc, char **argv) {
                     pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;
                     model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
                     
+                    break;
+                case RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE:
+                    pcl_perception_msg.request.req = PCL_FIND_GAZEBO_BEER_FRAME;
+                    g_pcl_perception_svc_client.call(pcl_perception_msg);
+                    model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
+                     
                     break;
                 default:
                     ROS_WARN("this mode is not implemented");

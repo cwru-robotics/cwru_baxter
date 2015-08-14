@@ -77,6 +77,8 @@ const int PCL_FIND_ON_TABLE = 5;
 const int PCL_TAKE_SNAPSHOT = 6;
 const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
 const int PCL_FIND_COKE_FRAME = 8;
+const int PCL_FIND_GAZEBO_BEER_FRAME = 9;
+const int PCL_SORT_POINTS_BY_HORIZ_SLABS = 10;
 
 const int PCL_FRAME_SVC_MODEL_GET_MODEL_FRAME_WRT_TORSO=2;
 
@@ -100,6 +102,7 @@ const int silhouette_size = 128; //set chosen resolution for sampling "bed of na
 
 const double default_table_z_height_wrt_baxter_base_frame = -0.213; // experimentally, this is height of stool relative to baxter frame;
                                                                     // OK for default, but more generally, replace this with data from perception in calls to find objects
+                                                                    // gazebo: table height w/rt base = -0.154706
 
 
 
@@ -127,6 +130,14 @@ void copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, PointCloud<pcl::Point
 void copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &indices, PointCloud<pcl::PointXYZ>::Ptr outputCloud);
 
 void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps);
+// given a cloud, sort the points by horizontal "slabs" of thickness dz_slab from z_min to z_max search range;
+// return the indices of points within each slab, as well as top/bottom dims of each slab;
+// slabs overlap slightly
+void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, double z_search_min, double z_search_max, double dz_slab, 
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
+
+void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, vector<int> indices, double z_search_min, double z_search_max, double dz_slab, 
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
 
 void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector4f &plane_params);
 void compute_radial_error(PointCloud<pcl::PointXYZ>::Ptr inputCloud, std::vector<int> indices, double r, Eigen::Vector3f center, double &E, double &dEdCx, double &dEdCy);
@@ -377,7 +388,7 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     g_A_plane.linear()= g_R_transform;
     //g_A_plane.translation() = g_base_origin; //g_plane_origin; //hmm...did not work
     g_A_plane.translation() = g_plane_origin;
-    //cout<<"Defining plane coord sys: origin: "<<g_plane_origin.transpose()<<endl;
+    cout<<"Defining plane coord sys: origin: "<<g_plane_origin.transpose()<<endl;
     cout<<"Orientation from plane: "<<endl;
     cout<<g_R_transform<<endl;
     
@@ -388,10 +399,10 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     
     int npts_selected = g_cloud_transformed->width * g_cloud_transformed->height;
     cout<<"transformed "<<npts_selected<<" points from selection"<<endl;
-    //for (int i = 0; i < npts_selected; ++i) {
-    //    selected_pt = g_cloud_transformed->points[i].getVector3fMap();
-    //    cout<<selected_pt.transpose()<<endl;
-    //}        
+    for (int i = 0; i < npts_selected; ++i) {
+        selected_pt = g_cloud_transformed->points[i].getVector3fMap();
+        cout<<selected_pt.transpose()<<endl;
+    }        
     
     // use the following to transform kinect points into the plane frame; could do translation as well, but not done here
     //Eigen::Matrix3f R_transpose = g_R_transform.transpose();
@@ -410,8 +421,8 @@ void find_plane(Eigen::Vector4f plane_params, std::vector<int> &indices_z_eps) {
     //transform_cloud(g_pclKinect, R_transpose, g_cloud_transformed); // rotate the entire point cloud
     transform_cloud(g_pclKinect, g_A_plane.inverse(), g_cloud_transformed); // transform the entire point cloud   
     //test test test...look for points near z=0
-    //int npts_transformed = g_pclKinect->width * g_pclKinect->height;
-    //cout<<"npts_transformed = "<<npts_transformed<<endl;
+    int npts_transformed = g_pclKinect->width * g_pclKinect->height;
+    cout<<"from kinect cloud, g_pclKinect npts_transformed = "<<npts_transformed<<endl;
             
     //int ans;
     //cout<<"transformed "<<npts_transformed<<" points from selection"<<endl;
@@ -689,7 +700,7 @@ void find_bounding_box(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &i
         float &x_min, float &x_max, float &y_min, float &y_max, float &z_min, float &z_max) {
     int npts = indices.size();
     Eigen::Vector3f pt;
-    
+
     //init extrema:
     pt = inputCloud->points[indices[0]].getVector3fMap();
     cout<<"first point: "<<pt.transpose()<<endl;
@@ -716,6 +727,154 @@ void find_bounding_box(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &i
     ROS_INFO(" x_min, x_max, y_min, y_max, z_min, z_max = %f %f %f %f %f %f",x_min,x_max,y_min,y_max,z_min,z_max);
     
 }
+
+void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, double z_search_min, double z_search_max, double dz_slab, 
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs) {
+
+    int npts = inputCloudWrtBase->width * inputCloudWrtBase->height;
+    Eigen::Vector3f pt;
+    // sort points from z_min to z_max in slabs of thickness dz_slab
+    // allow overlap of z_overlap to avoid boundary issues
+    double z_overlap = 0.02; // choose this much overlap
+    int nslabs =  1+(z_search_max-z_search_min+z_overlap)/dz_slab;
+    ROS_INFO("sorting points into %d slabs",nslabs);
+    //vector<float> z_mins;
+    //vector<float> z_maxs;
+    z_mins.resize(nslabs);
+    z_maxs.resize(nslabs);
+    z_mins[0] = z_search_min;
+    z_maxs[0] = z_search_min+dz_slab+z_overlap;
+    for (int i=1;i<nslabs;i++) {
+        z_mins[i] = z_mins[i-1]+dz_slab;
+        z_maxs[i] = z_mins[i] + dz_slab + z_overlap;       
+    }
+    //classify each pt by slab membership
+    //vector<vector<int> > indices_by_slab; 
+    indices_by_slab.clear();
+    indices_by_slab.resize(nslabs);
+    ROS_INFO("clearing out vector of vectors...");
+    for (int i=0;i<nslabs;i++) indices_by_slab[i].clear();
+    double z_height;
+    int i_slab;
+    // given z-height, nominal slab number = floor((z_height-z_search_min)/dz_slab)
+    // but also check above and below overlaps
+   for (int ipt=0;ipt<npts;ipt++) {
+        pt = inputCloudWrtBase->points[ipt].getVector3fMap();
+        //ROS_INFO(" pt %d: %f, %f, %f",ipt,pt(0),pt(1),pt(2));
+        z_height = pt(2);
+        if (z_height==z_height) { // watch out for nan?
+        i_slab = floor((z_height-z_search_min)/dz_slab); //nom slab membership--but check above and below as well
+        indices_by_slab[i_slab].push_back(ipt);
+        if (i_slab< nslabs-2) {  // not the top slab--so look above
+             if (z_height>z_mins[i_slab+1]) {
+            //pt also fits in overlap w/ next higher slab:
+            indices_by_slab[i_slab+1].push_back(ipt);
+             }
+        }
+        //check below:
+        if (i_slab>0){ // not the bottom slab
+            if (z_height<z_maxs[i_slab-1]) {
+                //pt also fits in overlap w/ next lower slab:
+                indices_by_slab[i_slab-1].push_back(ipt);
+            }
+        }   
+        }
+        else  {
+            //ROS_INFO("pt %d: Nan!", ipt);  //got LOTS of NaN's; (pts > 260,000); don't know why
+        }
+   } // done sorting points by slabs
+    // find the slab with the most points:
+    i_best_slab=0;
+    int npts_islab = indices_by_slab[i_best_slab].size();
+    int npts_best_slab = npts_islab;
+    
+
+    ROS_INFO("npts slab %d = %d",i_best_slab,npts_best_slab);
+    for (int islab=1;islab<nslabs;islab++) {
+        npts_islab = indices_by_slab[islab].size();
+        ROS_INFO("npts slab %d = %d",islab,npts_islab);
+        if (npts_islab>npts_best_slab) {
+           npts_best_slab = npts_islab; 
+           i_best_slab = islab;
+        }
+    }
+    ROS_INFO("best slab num = %d with %d pts",i_best_slab,npts_best_slab);
+}
+
+// variant--operate only on listed points from pointcloud
+void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, vector<int> indices, double z_search_min, double z_search_max, double dz_slab, 
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs) {
+    int npts = indices.size(); //inputCloudWrtBase->width * inputCloudWrtBase->height;
+    Eigen::Vector3f pt;
+    // sort points from z_min to z_max in slabs of thickness dz_slab
+    // allow overlap of z_overlap to avoid boundary issues
+    double z_overlap = 0.001; // choose this much overlap
+    int nslabs =  1+(z_search_max-z_search_min+z_overlap)/dz_slab;
+    ROS_INFO("sorting points into %d slabs",nslabs);
+    //vector<float> z_mins;
+    //vector<float> z_maxs;
+    z_mins.resize(nslabs);
+    z_maxs.resize(nslabs);
+    z_mins[0] = z_search_min;
+    z_maxs[0] = z_search_min+dz_slab+z_overlap;
+    for (int i=1;i<nslabs;i++) {
+        z_mins[i] = z_mins[i-1]+dz_slab;
+        z_maxs[i] = z_mins[i] + dz_slab + z_overlap;       
+    }
+    //classify each pt by slab membership
+    //vector<vector<int> > indices_by_slab; 
+    indices_by_slab.clear();
+    indices_by_slab.resize(nslabs);
+    ROS_INFO("clearing out vector of vectors...");
+    for (int i=0;i<nslabs;i++) indices_by_slab[i].clear();
+    double z_height;
+    int i_slab;
+    // given z-height, nominal slab number = floor((z_height-z_search_min)/dz_slab)
+    // but also check above and below overlaps
+    int sel_pt;
+   for (int ipt=0;ipt<npts;ipt++) {
+       sel_pt = indices[ipt];
+        pt = inputCloudWrtBase->points[sel_pt].getVector3fMap();
+        //ROS_INFO(" pt %d: %f, %f, %f",ipt,pt(0),pt(1),pt(2));
+        z_height = pt(2);
+        if (z_height==z_height) { // watch out for nan?
+        i_slab = floor((z_height-z_search_min)/dz_slab); //nom slab membership--but check above and below as well
+        indices_by_slab[i_slab].push_back(sel_pt);
+        if (i_slab< nslabs-2) {  // not the top slab--so look above
+             if (z_height>z_mins[i_slab+1]) {
+            //pt also fits in overlap w/ next higher slab:
+            indices_by_slab[i_slab+1].push_back(sel_pt);
+             }
+        }
+        //check below:
+        if (i_slab>0){ // not the bottom slab
+            if (z_height<z_maxs[i_slab-1]) {
+                //pt also fits in overlap w/ next lower slab:
+                indices_by_slab[i_slab-1].push_back(sel_pt);
+            }
+        }   
+        }
+        else  {
+            //ROS_INFO("pt %d: Nan!", ipt);  //got LOTS of NaN's; (pts > 260,000); don't know why
+        }
+   } // done sorting points by slabs
+    // find the slab with the most points:
+    i_best_slab=0;
+    int npts_islab = indices_by_slab[i_best_slab].size();
+    int npts_best_slab = npts_islab;
+    
+
+    ROS_INFO("npts slab %d = %d",i_best_slab,npts_best_slab);
+    for (int islab=1;islab<nslabs;islab++) {
+        npts_islab = indices_by_slab[islab].size();
+        ROS_INFO("npts slab %d = %d",islab,npts_islab);
+        if (npts_islab>npts_best_slab) {
+           npts_best_slab = npts_islab; 
+           i_best_slab = islab;
+        }
+    }
+    ROS_INFO("best slab num = %d with %d pts",i_best_slab,npts_best_slab);
+}    
 
 //compute a depth map, as viewed from above an object
 // provide x and y range; make sure nsize is the array size
@@ -905,6 +1064,8 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
         poseStamped.pose = pose;
         poseStamped.header.stamp = ros::Time().now();
         poseStamped.header.frame_id = "torso"; // this mode assumes affine is w/rt torso
+        response.poseStamped_IM_current = poseStamped;
+
     } else {
 
         cout << "model frame origin: " << g_A_model.translation().transpose() << endl;
@@ -946,6 +1107,8 @@ void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     //pcl::fromROSMsg(*cloud, *g_pclSelect);
     ROS_INFO("RECEIVED NEW PATCH w/  %d * %d points", g_pclSelect->width, g_pclSelect->height);
     //ROS_INFO("frame id is: %s",cloud->header.frame_id);
+    ROS_INFO("setting frame_id to camera_rgb_optical_frame");
+    g_pclSelect->header.frame_id = "camera_rgb_optical_frame";
     //cout << "header frame: " << cloud->header.frame_id << endl;
     int npts = g_pclSelect->width * g_pclSelect->height;
     std::vector<int> iselect_filtered; //indices of patch that do not contain outliers
@@ -969,6 +1132,10 @@ void kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
         cout << "header frame: " << g_pclKinect->header.frame_id << endl;
         int npts = g_pclKinect->width * g_pclKinect->height;
         ROS_INFO("npts = %d",npts);
+        cout<<"transforming new kinect cloud into base coords"<<endl;
+        transform_cloud(g_pclKinect, g_affine_kinect_to_base.inverse(),  g_cloud_wrt_base);
+        npts = g_cloud_wrt_base->width * g_cloud_wrt_base->height;
+        ROS_INFO("npts transformed = %d",npts);        
  
     }
     g_take_snapshot=false; //don't do this again until requested
@@ -996,9 +1163,9 @@ int main(int argc, char** argv) {
 
                 //tfListener.lookupTransform("kinect_pc_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
             } catch(tf::TransformException &exception) {
-                ROS_ERROR("%s", exception.what());
+                ROS_WARN("%s", exception.what());
                 tferr=true;
-                ros::Duration(0.5).sleep(); // sleep for half a second
+                ros::Duration(1).sleep(); // sleep for half a second
                 ros::spinOnce();                
             }   
     }
@@ -1013,7 +1180,7 @@ int main(int argc, char** argv) {
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
     ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/camera/depth_registered/points", 1, kinectCB);
-    //ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
+    ros::Subscriber getPCLPoints_sim = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
     
     cout<<"subscribing to selected points"<<endl;  
     
@@ -1052,8 +1219,17 @@ int main(int argc, char** argv) {
     double dEdCy=0.0;
     double dEnorm;
     float cx,cy;  
+    
+    // init values in g_A_model_wrt_base to test service
+    Eigen::Matrix3f Rmodel;
+    Rmodel<< 1,0,0,
+            0,1,0,
+            0,0,1;
 
     Eigen::Vector3f can_center_wrt_plane;
+    can_center_wrt_plane<<2,1,0;
+    g_A_model_wrt_base.linear() = Rmodel;
+    g_A_model_wrt_base.translation()=can_center_wrt_plane;
     Eigen::Vector3f height_delta_wrt_sensor_frame;
     Eigen::Affine3f A_plane_to_sensor;
     //std::vector<Eigen::Affine3d> grasp_xforms;
@@ -1064,6 +1240,19 @@ int main(int argc, char** argv) {
     //cout<<"enter 1 to start loop: ";
     //cin>>ans;
             
+    double z_slabs_min= -1.5;
+    double z_slabs_max=  1.0;
+    double dz_slab = 0.05;
+    int i_best_slab = 0;
+    int nslabs;
+    vector<int> indices_slab_i;
+    std::vector<vector<int> > indices_by_slab;
+    vector<int> indices_windowed;
+    int npts_windowed, npts_slab;
+    int window_bkpt;
+    int islab_can_top=31; //want to find this...be more intelligent about it
+    vector<float> z_mins; 
+    vector<float> z_maxs;
     while (ros::ok()) {
         if (g_trigger) {
             g_trigger = false; // reset the trigger
@@ -1076,6 +1265,66 @@ int main(int argc, char** argv) {
                     //g_trigger = true; 
                     //g_pcl_process_mode=MAKE_CAN_CLOUD;
                     
+                    break;
+                case PCL_SORT_POINTS_BY_HORIZ_SLABS:
+                    ROS_INFO("sort points by slabs...");
+                    sort_pts_by_horiz_planes(g_cloud_wrt_base, z_slabs_min, z_slabs_max, dz_slab, indices_by_slab, i_best_slab, z_mins,z_maxs);
+                    nslabs = indices_by_slab.size();
+                    ROS_INFO("windowing nslabs = %d",nslabs);
+                    for (int islab=0;islab<nslabs;islab++) {
+                        indices_slab_i= indices_by_slab[islab];
+                        npts_slab= indices_slab_i.size();
+                        if (npts_slab>0) {
+
+                            ROS_INFO("slab %d has %d points btwn z= %f and %f",islab,npts_slab,z_mins[islab],z_maxs[islab]);
+                            //debug display slab by slab
+                            copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
+                            pcl::toROSMsg(*g_display_cloud,*g_pcl2_display_cloud);
+                            g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            ros::spinOnce();
+                            ROS_INFO("enter 1: ");
+                            cin>>window_bkpt;
+                            object_finder.xy_window(g_cloud_wrt_base, indices_slab_i, indices_windowed); 
+                            npts_windowed = indices_windowed.size();
+                            ROS_INFO("windowed slab %d has %d points;  ",islab,npts_windowed);
+                            //debug display slab by slab
+                            copy_cloud(g_pclKinect, indices_windowed, g_display_cloud);
+                            pcl::toROSMsg(*g_display_cloud,*g_pcl2_display_cloud);
+                            g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            ros::spinOnce();
+                            ROS_INFO("enter 1: ");
+                            cin>>window_bkpt;                            
+                        }
+                    }
+                    // reslice slabnum 31...will want to make this more intelligent
+                    indices_slab_i= indices_by_slab[islab_can_top];
+                    object_finder.xy_window(g_cloud_wrt_base, indices_slab_i, indices_windowed); //repeated from above
+                    z_slabs_min = z_mins[islab_can_top];
+                    z_slabs_max = z_maxs[islab_can_top];
+                    dz_slab = 0.01;
+                    
+                    // for points within chosen thick slab, windowed in x,y, slice into thinner slabs:
+                    sort_pts_by_horiz_planes(g_cloud_wrt_base,indices_windowed, z_slabs_min, z_slabs_max, dz_slab, indices_by_slab, i_best_slab, z_mins,z_maxs);
+                    nslabs = indices_by_slab.size();
+                    for (int islab=0;islab<nslabs;islab++) {
+                        indices_slab_i= indices_by_slab[islab];
+                        npts_slab= indices_slab_i.size();
+                        if (npts_slab>0) {
+                            ROS_INFO("slab %d has %d points btwn z= %f and %f",islab,npts_slab,z_mins[islab],z_maxs[islab]);
+                            //debug display slab by slab
+                            copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
+                            pcl::toROSMsg(*g_display_cloud,*g_pcl2_display_cloud);
+                            g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            ros::spinOnce();
+                            ROS_INFO("enter 1: ");
+                            cin>>window_bkpt;                      
+                        }
+                    }
+                    
+                    ROS_INFO("done analyzing slabs");
                     break;
                 case PCL_MAKE_CAN_CLOUD:
                     ROS_INFO("creating a can cloud");
@@ -1189,6 +1438,20 @@ int main(int argc, char** argv) {
                     g_A_model_wrt_base=eigen_affine_3d_to_3f(affine_model_frame_wrt_baxter_base); // this value will be available for service to report out
                     
                 break;
+                case PCL_FIND_GAZEBO_BEER_FRAME:
+                    ROS_INFO("case PCL_FIND_GAZEBO_BEER_FRAME");
+                     affine_model_frame_wrt_baxter_base = object_finder.find_gazebo_beer_can_frame(g_cloud_wrt_base);
+                    
+                    // debug output:
+                    model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
+                    ROS_INFO("beer can model frame w/rt base: %f, %f, %f \n ",model_frame_origin(0),model_frame_origin(1),model_frame_origin(2));               
+                    cout<<"R = "<<endl;
+                    cout<<affine_model_frame_wrt_baxter_base.linear()<<endl;
+                    g_A_model_wrt_base=eigen_affine_3d_to_3f(affine_model_frame_wrt_baxter_base); // this value will be available for service to report out
+                    cout<<"g_A_model_wrt_base origin: "<< g_A_model_wrt_base.translation()<<endl;
+                                    
+                    
+                    break;
 
                 case PCL_FIND_ON_TABLE:
                     ROS_INFO("filtering for objects on most recently defined plane: not implemented yet");

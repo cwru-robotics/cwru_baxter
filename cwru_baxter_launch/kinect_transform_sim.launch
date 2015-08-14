@@ -1,0 +1,20 @@
+<launch>
+<!-- need camera link for Kinect driver -->
+
+<!-- make this tf external for tuning -->
+<!-- this version for simu...still use camera_rgb_optical_frame-->
+<!-- kinect_link connects to head via URDF -->
+<!-- have real kinect connect to a kinect_link_phys (?) -->
+
+<node pkg="tf" type="static_transform_publisher" name="kinect_calib" args="0 0 0 0 0 0 1 head kinect_link_phys 50"/>
+
+<!-- these for debug, if do not launch freenect for Kinect -->
+
+<node pkg="tf" type="static_transform_publisher" name="kinect_sensor2" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link_sim camera_depth_optical_frame 50"/>
+<node pkg="tf" type="static_transform_publisher" name="kinect_sensor3" args="0 0 0 -0.500 0.500 -0.500 0.500 camera_depth_optical_frame camera_rgb_optical_frame 50"/>
+
+<node pkg="tf" type="static_transform_publisher" name="camera_link_sim_bdcst" args="0.0 0 0  3.14 -1.57 -1.57  kinect_link kinect_link_sim 50"/>
+
+<!--node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0.17 -0.05 0.075  0.1 1.08 -3.07   kinect_link_phys camera_link 50"-->
+</launch>
+
