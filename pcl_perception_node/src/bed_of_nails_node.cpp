@@ -79,6 +79,8 @@ const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
 const int PCL_FIND_COKE_FRAME = 8;
 const int PCL_FIND_GAZEBO_BEER_FRAME = 9;
 const int PCL_SORT_POINTS_BY_HORIZ_SLABS = 10;
+const int PCL_FIND_FLOOR = 11;
+const int PCL_FIND_TABLE = 12;
 
 const int PCL_FRAME_SVC_MODEL_GET_MODEL_FRAME_WRT_TORSO=2;
 
@@ -1243,6 +1245,7 @@ int main(int argc, char** argv) {
     double z_slabs_min= -1.5;
     double z_slabs_max=  1.0;
     double dz_slab = 0.05;
+    double z_table;
     int i_best_slab = 0;
     int nslabs;
     vector<int> indices_slab_i;
@@ -1427,6 +1430,34 @@ int main(int argc, char** argv) {
                      find_bounding_box(g_cloud_transformed, indices_pts_above_plane,x_min,x_max,y_min,y_max,z_min,z_max);
                     break;
                     
+                case PCL_FIND_FLOOR:
+                    ROS_INFO("case PCL_FIND_FLOOR");
+                    object_finder.find_floor(g_cloud_wrt_base, indices_slab_i);
+                    npts_slab= indices_slab_i.size();
+                    
+                    ROS_INFO("presumed floor slab has %d points ",npts_slab);
+                    //debug display slab by slab
+                    copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
+                    pcl::toROSMsg(*g_display_cloud,*g_pcl2_display_cloud);
+                    g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    ros::spinOnce();
+                    break;
+
+                case PCL_FIND_TABLE:
+                    ROS_INFO("case PCL_FIND_TABLE");
+                    npts_slab= object_finder.find_table(g_cloud_wrt_base, indices_slab_i,z_table);
+                    //npts_slab= indices_slab_i.size();
+                    
+                    ROS_INFO("presumed table slab has %d points at height %f ",npts_slab,z_table);
+                    //debug: display the table pts
+                    copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
+                    pcl::toROSMsg(*g_display_cloud,*g_pcl2_display_cloud);
+                    g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    ros::spinOnce();
+                    break;
+                    
                 case PCL_FIND_COKE_FRAME:
                     affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base,default_table_z_height_wrt_baxter_base_frame);
                     
@@ -1440,7 +1471,8 @@ int main(int argc, char** argv) {
                 break;
                 case PCL_FIND_GAZEBO_BEER_FRAME:
                     ROS_INFO("case PCL_FIND_GAZEBO_BEER_FRAME");
-                     affine_model_frame_wrt_baxter_base = object_finder.find_gazebo_beer_can_frame(g_cloud_wrt_base);
+                    z_table = object_finder.get_table_height();
+                     affine_model_frame_wrt_baxter_base = object_finder.find_gazebo_beer_can_frame(g_cloud_wrt_base, z_table);
                     
                     // debug output:
                     model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
