@@ -35,7 +35,7 @@ using namespace std;
 
 //#include <cwru_srv/>
 //command codes for interactive marker: get/set pose
-cwru_srv::IM_node_service_message pcl_getframe_msg;
+cwru_srv::IM_node_service_message g_pcl_getframe_msg;
     cwru_srv::IM_node_service_message IM_6dof_srv_msg;
 const int IM_GET_CURRENT_MARKER_POSE=0;
 const int IM_SET_NEW_MARKER_POSE= 1;
@@ -43,7 +43,7 @@ const int IM_SET_NEW_MARKER_POSE= 1;
 //command codes for reachability node--only 1 action at present, so only need to provide z-height value
 cwru_srv::simple_float_service_message reachability_msg;
 
-cwru_srv::simple_int_service_message pcl_perception_msg;
+cwru_srv::simple_int_service_message g_pcl_perception_msg;
 
 
 //incoming command codes for this coordinator service:
@@ -107,8 +107,30 @@ const int ARM_RECEIVED_AND_COMPLETED_RQST=5;
 const int ARM_PATH_IS_VALID=6;
 const int ARM_PATH_NOT_VALID=7;
 
+const int PCL_IDENTIFY_PLANE = 0;
+const int PCL_FIND_PNTS_ABOVE_PLANE = 1;
+const int PCL_COMPUTE_CYLINDRICAL_FIT_ERR_INIT = 2;
+const int PCL_COMPUTE_CYLINDRICAL_FIT_ERR_ITERATE = 3;
+const int PCL_MAKE_CAN_CLOUD = 4;
+const int PCL_FIND_ON_TABLE = 5;
+const int PCL_TAKE_SNAPSHOT = 6;
+const int PCL_COMPUTE_Z_BED_OF_NAILS = 7;
 const int PCL_FIND_COKE_FRAME = 8;
 const int PCL_FIND_GAZEBO_BEER_FRAME = 9;
+const int PCL_SORT_POINTS_BY_HORIZ_SLABS = 10;
+const int PCL_FIND_FLOOR = 11;
+const int PCL_FIND_TABLE = 12;
+const int PCL_INQUIRE_STATUS = 13;
+const int PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME = 14;
+
+const int PCL_STATUS_BUSY = 1;
+const int PCL_STATUS_IDLE = 0;
+
+const int PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_KINECT = 1;
+const int PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO = 2;
+const int PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_MODEL = 3;
+const int PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_TORSO = 4;
+
 
 bool g_trigger = false;
 int g_coordinator_mode = RQST_DO_NOTHING;
@@ -131,14 +153,45 @@ bool coordinatorService(cwru_srv::simple_int_service_messageRequest& request, cw
     return true;
 }
 
+
+//convert a tf to an affine transform;
+// note that this loses the header, including frame_id and parent frame
+Eigen::Affine3f affine3f_from_poseStamped(geometry_msgs::PoseStamped poseStamped) {
+    Eigen::Affine3f affine_result;
+    Eigen::Vector3f origin_vec;
+    origin_vec[0] = poseStamped.pose.position.x;
+    origin_vec[1] = poseStamped.pose.position.y;
+    origin_vec[2] = poseStamped.pose.position.z;
+    affine_result.translation() = origin_vec;
+
+    Eigen::Quaternionf quat;
+    quat.x() = poseStamped.pose.orientation.x;
+    quat.y() = poseStamped.pose.orientation.y;
+    quat.z() = poseStamped.pose.orientation.z;
+    quat.w() = poseStamped.pose.orientation.w;
+    Eigen::Matrix3f R(quat);
+    affine_result.linear() = R;
+    return affine_result;
+}
+
+
+Eigen::Affine3f get_grasp_transform() {
+    g_pcl_getframe_msg.request.cmd_mode = PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_MODEL; // modes 1 or 2: frame in kinect coords (1) or torso (2)
+    bool status = g_pcl_getframe_svc_client.call(g_pcl_getframe_msg);
+    geometry_msgs::PoseStamped pose_grasp_wrt_model;
+    pose_grasp_wrt_model = g_pcl_getframe_msg.response.poseStamped_IM_current;// name is misnomer--really just re-using this srv type
+    Eigen::Affine3f grasp_wrt_model_frame = affine3f_from_poseStamped(pose_grasp_wrt_model);
+}
+
+
 geometry_msgs::PoseStamped get_model_pose_wrt_torso(int cmd_mode) {
     geometry_msgs::PoseStamped poseStamped;
 
-    ROS_INFO("requesting model pose from pcl_perception: ");
-    pcl_getframe_msg.request.cmd_mode = cmd_mode; // modes 1 or 2: frame in kinect coords (1) or torso (2)
-    bool status = g_pcl_getframe_svc_client.call(pcl_getframe_msg);
+    ROS_INFO("requesting pose from pcl_perception: ");
+    g_pcl_getframe_msg.request.cmd_mode = cmd_mode; // modes 1 or 2: frame in kinect coords (1) or torso (2)
+    bool status = g_pcl_getframe_svc_client.call(g_pcl_getframe_msg);
     geometry_msgs::PoseStamped pose_from_pcl, pose_wrt_torso;
-    pose_from_pcl = pcl_getframe_msg.response.poseStamped_IM_current;
+    pose_from_pcl = g_pcl_getframe_msg.response.poseStamped_IM_current;
     ROS_INFO("got current model pose: x,y,z = %f, %f, %f",
             pose_from_pcl.pose.position.x,
             pose_from_pcl.pose.position.y,
@@ -149,25 +202,12 @@ geometry_msgs::PoseStamped get_model_pose_wrt_torso(int cmd_mode) {
             pose_from_pcl.pose.orientation.z,
             pose_from_pcl.pose.orientation.w);
 
-    // need to transform this into torso coords:
-    /*
-    tf::Vector3 pos = tf_kinect_wrt_torso.getOrigin();
-    tf::Quaternion tf_quaternion = tf_kinect_wrt_torso.getRotation();
-
-    quaternion.x = tf_quaternion.x();
-    quaternion.y = tf_quaternion.y();
-    quaternion.z = tf_quaternion.z();
-    quaternion.w = tf_quaternion.w();
-    ROS_INFO("transform components: ");
-    ROS_INFO("x,y, z = %f, %f, %f", pos[0], pos[1], pos[2]);
-    ROS_INFO("q x,y,z,w: %f %f %f %f", quaternion.x, quaternion.y, quaternion.z, quaternion.w);
-     * */
+    // transform this into torso coords:
     g_tfListener_ptr->transformPose("torso", pose_from_pcl, pose_wrt_torso);
-    ROS_INFO("model pose w/rt torso: ");
+    ROS_INFO("pose w/rt torso: ");
     ROS_INFO("origin: %f, %f, %f", pose_wrt_torso.pose.position.x, pose_wrt_torso.pose.position.y, pose_wrt_torso.pose.position.z);
     ROS_INFO("orientation: %f, %f, %f, %f", pose_wrt_torso.pose.orientation.x, pose_wrt_torso.pose.orientation.y, pose_wrt_torso.pose.orientation.z, pose_wrt_torso.pose.orientation.w);
     return pose_wrt_torso;
-
 }
 
 bool arm_server_busy_wait_done() {
@@ -185,6 +225,28 @@ bool arm_server_busy_wait_done() {
         ros::Duration(0.1).sleep();
         if (nwaits>50) {
             ROS_WARN("coord: giving up waiting on arm interface");
+            return false;
+        }
+    }
+    cout<<"done"<<endl;
+    return true;
+}
+
+bool perception_busy_wait_done() {
+    int status= PCL_STATUS_BUSY;
+    int nwaits=0;
+    cout<<"waiting on perception service: ";
+    while (status != PCL_STATUS_IDLE) {
+        g_pcl_perception_msg.request.req = PCL_INQUIRE_STATUS;
+        g_pcl_perception_svc_client.call(g_pcl_perception_msg);        
+        status = g_pcl_perception_msg.response.resp;
+        cout<<".";
+        nwaits++;
+        //cout<<"status code: "<<status<<endl;
+        ros::spinOnce();
+        ros::Duration(0.1).sleep();
+        if (nwaits>50) {
+            ROS_WARN("coord: giving up waiting on perception interface");
             return false;
         }
     }
@@ -211,7 +273,8 @@ int main(int argc, char **argv) {
 
     geometry_msgs::Pose pose;
     geometry_msgs::PoseStamped poseStamped;
-    geometry_msgs::PoseStamped pose_from_pcl, model_pose_wrt_torso;
+    geometry_msgs::PoseStamped pose_from_pcl, model_pose_wrt_torso,grasp_pose_wrt_model, grasp_pose_wrt_torso;
+    Eigen::Affine3f A_grasp_wrt_model;
     Eigen::Vector3d n_des, t_des, b_des;
     b_des << 0, 0, -1;
     n_des << 1, 0, 0;
@@ -407,14 +470,47 @@ int main(int argc, char **argv) {
                     break;
                     /**/
                 case RQST_GRAB_COKE_CAN_FROM_ABOVE:
-                    pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;
+                    g_pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;
                     model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
                     
                     break;
                 case RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE:
-                    pcl_perception_msg.request.req = PCL_FIND_GAZEBO_BEER_FRAME;
-                    g_pcl_perception_svc_client.call(pcl_perception_msg);
-                    model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
+                    ROS_INFO("rqst take snapshot");
+                    g_pcl_perception_msg.request.req = PCL_TAKE_SNAPSHOT; 
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find floor");
+                    g_pcl_perception_msg.request.req = PCL_FIND_FLOOR;  
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find table");
+                    g_pcl_perception_msg.request.req = PCL_FIND_TABLE;  
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find gazebo beer frame");
+                    g_pcl_perception_msg.request.req = PCL_FIND_GAZEBO_BEER_FRAME;   
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("requesting model frame from perception service");                    
+                    pose_from_pcl = get_model_pose_wrt_torso(PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO); // mode 2--model frame in base coords
+                    // put the marker coincident with the model frame:
+                    pose_from_pcl.header.stamp = ros::Time::now();
+                    ROS_INFO("requesting set new marker pose coincident w/ model frame");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = pose_from_pcl;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);    
+                    
+                    g_pcl_perception_msg.request.req = PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME;
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    grasp_pose_wrt_torso = get_model_pose_wrt_torso(PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_TORSO);
+                    // move marker here:
+                    ROS_INFO("requesting set new marker pose coincident w/ grasp frame");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = grasp_pose_wrt_torso;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                        
+                    
+                    //grasp_pose_wrt_model = get_grasp_transform; // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
                      
                     break;
                 default:

@@ -5,6 +5,10 @@
 // at present, talk to this node via service: cartMoveSvc
 // likely, later change to an action server
 
+//NOTE: ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE does: unpack_goal_pose(),
+// which does:     a_flange_end_ = a_tool_end_*A_tool_wrt_flange_.inverse();
+// then ik functions are w/rt desired flange frame
+
 // uses library of arm-motion planning functions
 #include <cartesian_moves/cart_path_planner_lib.h>
 #include <cwru_srv/arm_nav_service_message.h>

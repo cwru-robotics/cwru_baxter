@@ -565,13 +565,14 @@ int Baxter_IK_solver::ik_solve(Eigen::Affine3d const& desired_hand_pose) // solv
 
 
 
-int Baxter_IK_solver::ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns) {
+int Baxter_IK_solver::ik_solve_approx_wrt_torso(Eigen::Affine3d const& desired_flange_pose,std::vector<Vectorq7x1> &q_solns) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
-    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount_.inverse()*desired_hand_pose_wrt_torso;
+    Eigen::Affine3d desired_hand_pose_wrt_arm_mount = Affine_torso_to_rarm_mount_.inverse()*desired_flange_pose;
     ik_solve_approx(desired_hand_pose_wrt_arm_mount,q_solns);
 }
 
+//hmm...really, flange pose, not hand pose 
 int Baxter_IK_solver::ik_wristpt_solve_approx_wrt_torso(Eigen::Affine3d const& desired_hand_pose_wrt_torso,std::vector<Vectorq7x1> &q_solns) {
     //convert desired_hand_pose into equiv w/rt right-arm mount frame:
     //Eigen::Affine3d desired_hand_pose_wrt_arm_mount = transform_affine_from_torso_frame_to_arm_mount_frame(desired_hand_pose);
@@ -617,7 +618,7 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const&
 //major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
 // for WRIST ONLY; ignores last 3DOF's
 // for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
-int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_hand_pose,std::vector<Vectorq7x1> &q_solns_123) // given desired hand pose, find all viable IK solns for wrist pt
+int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_flange_pose,std::vector<Vectorq7x1> &q_solns_123) // given desired hand pose, find all viable IK solns for wrist pt
 { 
   double q_s0_ctr = compute_qs0_ctr(desired_hand_pose);
   //cout<<"ik_solve_approx: q_s0_ctr = "<<q_s0_ctr<<endl;

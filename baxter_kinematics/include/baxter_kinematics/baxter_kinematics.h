@@ -4,6 +4,10 @@
  *
  * Created May 26, 2015
  */
+//NOTE: IK functions are/ w/rt tool flange frame; 
+// calling fnc must first convert desired hand frame to tool-flange frame, e.g.:
+//     a_flange_end_ = a_tool_end_*A_tool_wrt_flange_.inverse();
+
 
 #ifndef BAXTER_KIN_H
 #define	BAXTER_KIN_H

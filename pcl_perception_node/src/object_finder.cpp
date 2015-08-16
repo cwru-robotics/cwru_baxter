@@ -40,16 +40,15 @@ public:
     //void find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height, std::vector<Eigen::Affine3d> &grasp_xforms);
     Eigen::Affine3d find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height);
     // add lots more special-purpose fncs here...
-    Eigen::Affine3d find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height);
-    ///given a pointer to a point cloud and a list if inidices of interest, find list of indices for which the points
-    // lie within a prescribed x and y window
-    void xy_window(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> input_indices, vector<int> &output_indices,
-            double x_min = TABLE_VIEW_X_MIN, double x_max = TABLE_VIEW_X_MAX, double y_min = TABLE_VIEW_Y_MIN, double y_max = TABLE_VIEW_Y_MAX);
-    void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, double z_search_min, double z_search_max, double dz_slab,
-            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
-    void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, vector<int> indices, double z_search_min, double z_search_max, double dz_slab,
-            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
-
+    Eigen::Affine3d find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,
+        double table_height = default_cafe_table_z_height_wrt_baxter_base_frame);
+    
+    //well...models are so specific, grasp frames of models should be associated;
+    Eigen::Affine3f get_grasp_transform_gazebo_beer_grasp_from_above();
+     
+     
+ 
+    // some special-case objects: floor, table, and other horizontal surfaces
     //start w/ this: sorts all points into thick horizontal slabs;
     // finds most likely slab for floor, within floor search range;
     // subdivides this thick slab; returns indices of these points and sets internal var z_floor_
@@ -79,7 +78,15 @@ public:
         return z_top_of_object_;
     }
 
-
+   //helper functions...
+    ///given a pointer to a point cloud and a list if indices of interest, find list of indices for which the points
+    // lie within a prescribed x and y window
+    void xy_window(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> input_indices, vector<int> &output_indices,
+            double x_min = TABLE_VIEW_X_MIN, double x_max = TABLE_VIEW_X_MAX, double y_min = TABLE_VIEW_Y_MIN, double y_max = TABLE_VIEW_Y_MAX);
+    void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, double z_search_min, double z_search_max, double dz_slab,
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
+    void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, vector<int> indices, double z_search_min, double z_search_max, double dz_slab,
+            std::vector<vector<int> > &indices_by_slab, int &i_best_slab, vector<float> &z_mins, vector<float> &z_maxs);
 
 private:
     //helper and specialized functions
@@ -236,8 +243,7 @@ Eigen::Affine3d Object_finder::find_coke_can_frame(PointCloud<pcl::PointXYZ>::Pt
 
 }
 
-Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base,
-        double table_height = default_cafe_table_z_height_wrt_baxter_base_frame) {
+Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,double table_height) {
     //coke can dimensions, per Kinect data
     const double RADIUS = R_GAZEBO_BEER; //estimated from ruler tool...example to fit a cylinder of this radius to data
     const double H_CYLINDER = H_GAZEBO_BEER; // estimated height of cylinder
@@ -284,24 +290,28 @@ Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointX
         }
     }
     ROS_INFO("searching for can top: islab_last= %d", islab_last);
+    
     //now, use each of these slabs (perhaps only 1) to find can top
     double z_min_slab = z_mins_[islab_start];
     double z_max_slab = z_maxs_[islab_last];
     vector <int> indices_slab; 
     vector <int> indices_surface;
-    vector <int> indices_surface_optimal;
+    //vector <int> indices_surface_optimal;
     vector <int> indices_windowed_slab;
     int npts_can_top_optimal=0;
     int npts_can_top=0;
     double z_can_top=0.0;
-    
+    int npts_windowed;
     for (int islab=islab_start;islab<=islab_last;islab++) {
             indices_slab = indices_by_slab_[islab];
                //window this slab by x and y limits
             xy_window(pt_cloud_wrt_base, indices_slab, indices_windowed_slab);
+            npts_windowed = indices_windowed_slab.size();
+               //ROS_INFO("thick slab %d; indices_windowed_slab has %d points ", islab,npts_windowed);    
+         
             //search for can top within this slab:
             npts_can_top = find_surface(pt_cloud_wrt_base, indices_windowed_slab, indices_surface, DZ_SLAB_1CM, z_min_can_top, z_max_can_top, z_top_of_object_);
-            ROS_INFO("thick slab %d;  best subslab has %d points at height %f", islab,npts_can_top, z_top_of_object_);    
+            //ROS_INFO("thick slab %d;  best subslab has %d points at height %f", islab,npts_can_top, z_top_of_object_);    
             if (npts_can_top>npts_can_top_optimal) {
                 indices_surface_optimal=indices_surface;
                 npts_can_top_optimal = npts_can_top;
@@ -309,6 +319,9 @@ Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointX
             }   
     }
     z_top_of_object_ = z_can_top; //set internal var to best-guess can top height
+    ROS_INFO("optimal subslab has %d points at height %f", npts_can_top_optimal, z_can_top);    
+   
+    
 
     // project these points to an x-y plane, then find a best fit of a circle of given radius to these points;
     //  fill in the x and y components
@@ -321,6 +334,26 @@ Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointX
 
     return affine_model_frame_wrt_base;
 
+}
+
+//specialized fnc: return an affine transform corresponding to grasp from from above w/rt gazebo beer can frame
+// this is specific to a model, to a grasp strategy, and to a specific (Yale-hand) gripper
+ Eigen::Affine3f Object_finder::get_grasp_transform_gazebo_beer_grasp_from_above() {
+    float H_GAZEBO_BEER_GRASP_FROM_ABOVE_Z = H_GAZEBO_BEER+ 0.10; // TUNE THIS EXPERIMENTALLY
+    Eigen::Matrix3f R;
+    //not sure if this is correct; DO need z-axis pointing down; what direction of x-axis is desired?  towards torso?
+    R << -1, 0, 0,
+            0, 1, 0,
+            0, 0, -1;
+
+
+    Eigen::Vector3f grasp_frame_origin;
+    grasp_frame_origin<<0,0,H_GAZEBO_BEER_GRASP_FROM_ABOVE_Z;
+    
+     Eigen::Affine3f affine_grasp_frame_wrt_model;
+     affine_grasp_frame_wrt_model.linear() = R;
+     affine_grasp_frame_wrt_model.translation() = grasp_frame_origin;
+     return affine_grasp_frame_wrt_model;
 }
 
 // this version takes a whole cloud--no input indices
@@ -392,10 +425,10 @@ void Object_finder::sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inpu
     int npts_best_slab = npts_islab;
 
 
-    ROS_INFO("npts slab %d = %d", i_best_slab, npts_best_slab);
+    //ROS_INFO("npts slab %d = %d", i_best_slab, npts_best_slab);
     for (int islab = 1; islab < nslabs; islab++) {
         npts_islab = indices_by_slab[islab].size();
-        ROS_INFO("npts slab %d = %d", islab, npts_islab);
+        //ROS_INFO("npts slab %d = %d", islab, npts_islab);
         if (npts_islab > npts_best_slab) {
             npts_best_slab = npts_islab;
             i_best_slab = islab;
@@ -415,7 +448,7 @@ void Object_finder::sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inpu
     // allow overlap of z_overlap to avoid boundary issues
     double z_overlap = THIN_SLAB_OVERLAP; // choose this much overlap
     int nslabs = 1 + (z_search_max - z_search_min + z_overlap) / dz_slab;
-    ROS_INFO("sorting points into %d slabs", nslabs);
+    //ROS_INFO("sorting points into %d slabs", nslabs);
     //vector<float> z_mins;
     //vector<float> z_maxs;
     z_mins.resize(nslabs);
@@ -470,16 +503,16 @@ void Object_finder::sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inpu
     int npts_best_slab = npts_islab;
 
 
-    ROS_INFO("npts slab %d = %d", i_best_slab, npts_best_slab);
+   // ROS_INFO("npts slab %d = %d", i_best_slab, npts_best_slab);
     for (int islab = 1; islab < nslabs; islab++) {
         npts_islab = indices_by_slab[islab].size();
-        ROS_INFO("npts slab %d = %d", islab, npts_islab);
+        //ROS_INFO("npts slab %d = %d", islab, npts_islab);
         if (npts_islab > npts_best_slab) {
             npts_best_slab = npts_islab;
             i_best_slab = islab;
         }
     }
-    ROS_INFO("best slab num = %d with %d pts", i_best_slab, npts_best_slab);
+    //ROS_INFO("best slab num = %d with %d pts", i_best_slab, npts_best_slab);
 }
 
 // fnc to find floor; as part of process, sorts all points from an input point cloud into horizontal slabs that should bound the floor
@@ -632,7 +665,7 @@ int Object_finder::find_surface(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase
     vector< vector<int> >indices_by_slab;
     vector<int> indices_slab_i; // 
 
-    sort_pts_by_horiz_planes(inputCloudWrtBase, indices_slab_i, z_search_min, z_search_max, dz_slab, indices_by_slab, i_best_slab, z_mins, z_maxs);
+    sort_pts_by_horiz_planes(inputCloudWrtBase, input_indices, z_search_min, z_search_max, dz_slab, indices_by_slab, i_best_slab, z_mins, z_maxs);
     int nslabs = indices_by_slab.size();
     indices_surface = indices_by_slab[i_best_slab];
     int npts_surface = indices_surface.size();
