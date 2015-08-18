@@ -21,6 +21,9 @@ const double TABLE_SEARCH_MAX_Z = 0.0;
 const double R_GAZEBO_BEER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
 const double H_GAZEBO_BEER = 0.23; // estimated height of cylinder
 
+const double H_COKE_CAN = 0.12;
+const double R_COKE_CAN = 0.03;
+
 //const double default_table_z_height_wrt_baxter_base_frame = -0.2; // replace this with data from perception...later
 const double default_cafe_table_z_height_wrt_baxter_base_frame = -0.154706; //-0.213; // experimentally, this is height of stool relative to baxter frame;
 // OK for default, but more generally, replace this with data from perception in calls to find objects
@@ -39,13 +42,15 @@ public:
     //oops--perception node should not be responsible for assigning grasp frames--only for identifying object frames
     //void find_coke_can_grasps_from_above(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height, std::vector<Eigen::Affine3d> &grasp_xforms);
     Eigen::Affine3d find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height);
+    Eigen::Affine3d find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,double table_height); 
+    
     // add lots more special-purpose fncs here...
     Eigen::Affine3d find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,
         double table_height = default_cafe_table_z_height_wrt_baxter_base_frame);
     
     //well...models are so specific, grasp frames of models should be associated;
     Eigen::Affine3f get_grasp_transform_gazebo_beer_grasp_from_above();
-     
+   Eigen::Affine3f  get_grasp_transform_coke_can_grasp_from_above();
      
  
     // some special-case objects: floor, table, and other horizontal surfaces
@@ -210,6 +215,7 @@ void Object_finder::fit_horizontal_circle_to_points(double template_radius, Poin
     }
 }
 
+/*
 Eigen::Affine3d Object_finder::find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, double table_height) {
     //coke can dimensions, per Kinect data
     const double RADIUS = 0.03; //estimated from ruler tool...example to fit a cylinder of this radius to data
@@ -242,6 +248,103 @@ Eigen::Affine3d Object_finder::find_coke_can_frame(PointCloud<pcl::PointXYZ>::Pt
     return affine_model_frame_wrt_base;
 
 }
+ * */
+
+//need to generalize:  coke can and gazebo can have identical finder code, except for r and h dimensions
+
+Eigen::Affine3d Object_finder::find_coke_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,double table_height) {
+    //coke can dimensions, per Kinect data
+    const double RADIUS = R_COKE_CAN; //estimated from ruler tool...example to fit a cylinder of this radius to data
+    const double H_CYLINDER = H_COKE_CAN; // estimated height of cylinder
+    const double GRASP_V_OFFSET = 0.1; // TUNE THIS: appropriate vertical offset for can grasp from above
+    const double Z_TOL = 0.05;
+    // look for points +/- 1cm from expected can height
+    // gazebo beer-can top is at z= 0.075
+    double z_min_can_top = table_height + H_CYLINDER / 2.0; //- Z_TOL;
+    double z_max_can_top = table_height + H_CYLINDER * 1.5; // + Z_TOL;
+    ROS_INFO("looking for coke can");
+    Eigen::Matrix3d R;
+    R << 1, 0, 0,
+            0, 1, 0,
+            0, 0, 1;
+    Eigen::Affine3d affine_model_frame_wrt_base;
+
+
+    vector<int> indices_of_slab;
+    //vector<vector<int> > indices_thin_slabs;
+    Eigen::Vector3d model_frame_origin;
+
+    // fit model to points; identify model frame:
+    //find points within a thin, horizontal slab bounding expected height of can
+
+    //xy_window(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> input_indices, vector<int> &output_indices,double x_min, double x_max, double y_min, double y_max)   
+    // use the points by slabs...
+    // find first candidate slab:  
+    int nslabs = indices_by_slab_.size();
+    int islab_start = 0;
+    for (int islab = 0; islab < nslabs; islab++) {
+        if (z_maxs_[islab] > z_min_can_top) {
+            //found a slab that bounds min z search height:
+            islab_start = islab;
+            break;
+        }
+    }
+    int islab_last = islab_start;
+    ROS_INFO("searching for can top: islab_start= %d", islab_start);
+    for (int islab = islab_start; islab < nslabs; islab++) {
+        if (z_mins_[islab] > z_max_can_top) {
+            //found a slab that bounds min z search height:
+            islab_last = islab;
+            break;
+        }
+    }
+    ROS_INFO("searching for can top: islab_last= %d", islab_last);
+    
+    //now, use each of these slabs (perhaps only 1) to find can top
+    double z_min_slab = z_mins_[islab_start];
+    double z_max_slab = z_maxs_[islab_last];
+    vector <int> indices_slab; 
+    vector <int> indices_surface;
+    //vector <int> indices_surface_optimal;
+    vector <int> indices_windowed_slab;
+    int npts_can_top_optimal=0;
+    int npts_can_top=0;
+    double z_can_top=0.0;
+    int npts_windowed;
+    for (int islab=islab_start;islab<=islab_last;islab++) {
+            indices_slab = indices_by_slab_[islab];
+               //window this slab by x and y limits
+            xy_window(pt_cloud_wrt_base, indices_slab, indices_windowed_slab);
+            npts_windowed = indices_windowed_slab.size();
+               //ROS_INFO("thick slab %d; indices_windowed_slab has %d points ", islab,npts_windowed);    
+         
+            //search for can top within this slab:
+            npts_can_top = find_surface(pt_cloud_wrt_base, indices_windowed_slab, indices_surface, DZ_SLAB_1CM, z_min_can_top, z_max_can_top, z_top_of_object_);
+            //ROS_INFO("thick slab %d;  best subslab has %d points at height %f", islab,npts_can_top, z_top_of_object_);    
+            if (npts_can_top>npts_can_top_optimal) {
+                indices_surface_optimal=indices_surface;
+                npts_can_top_optimal = npts_can_top;
+                z_can_top = z_top_of_object_;
+            }   
+    }
+    z_top_of_object_ = z_can_top; //set internal var to best-guess can top height
+    ROS_INFO("optimal subslab has %d points at height %f", npts_can_top_optimal, z_can_top);    
+   
+    
+
+    // project these points to an x-y plane, then find a best fit of a circle of given radius to these points;
+    //  fill in the x and y components
+    fit_horizontal_circle_to_points(RADIUS, pt_cloud_wrt_base, indices_surface_optimal, model_frame_origin);
+    model_frame_origin(2) = table_height; // coke can frame origin defined at base of can, i.e. at table height    
+
+    // represent this as an affine matrix
+    affine_model_frame_wrt_base.linear() = R;
+    affine_model_frame_wrt_base.translation() = model_frame_origin;
+
+    return affine_model_frame_wrt_base;
+
+}
+
 
 Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointXYZ>::Ptr pt_cloud_wrt_base, vector<int> &indices_surface_optimal,double table_height) {
     //coke can dimensions, per Kinect data
@@ -355,6 +458,25 @@ Eigen::Affine3d Object_finder::find_gazebo_beer_can_frame(PointCloud<pcl::PointX
      affine_grasp_frame_wrt_model.translation() = grasp_frame_origin;
      return affine_grasp_frame_wrt_model;
 }
+ 
+ Eigen::Affine3f Object_finder:: get_grasp_transform_coke_can_grasp_from_above() {
+     float H_COKE_CAN_GRASP_FROM_ABOVE_Z = H_COKE_CAN+ 0.08; // TUNE THIS EXPERIMENTALLY
+    Eigen::Matrix3f R;
+    //not sure if this is correct; DO need z-axis pointing down; what direction of x-axis is desired?  towards torso?
+    R << -1, 0, 0,
+            0, 1, 0,
+            0, 0, -1;
+
+
+    Eigen::Vector3f grasp_frame_origin;
+    grasp_frame_origin<<0,0,H_COKE_CAN_GRASP_FROM_ABOVE_Z;
+    
+     Eigen::Affine3f affine_grasp_frame_wrt_model;
+     affine_grasp_frame_wrt_model.linear() = R;
+     affine_grasp_frame_wrt_model.translation() = grasp_frame_origin;
+     return affine_grasp_frame_wrt_model;    
+     
+ }
 
 // this version takes a whole cloud--no input indices
 

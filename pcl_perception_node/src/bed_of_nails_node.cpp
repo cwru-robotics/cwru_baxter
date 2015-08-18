@@ -83,6 +83,8 @@ const int PCL_FIND_FLOOR = 11;
 const int PCL_FIND_TABLE = 12;
 const int PCL_INQUIRE_STATUS = 13;
 const int PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME = 14;
+const int PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME = 15;
+
 
 const int PCL_STATUS_BUSY = 1;
 const int PCL_STATUS_IDLE = 0;
@@ -195,16 +197,19 @@ Eigen::Affine3f g_A_plane, g_A_model_wrt_torso, g_A_model_wrt_base;
 Eigen::Affine3f g_A_grasp_wrt_model, g_A_grasp_wrt_base;
 Eigen::Affine3d g_A3d_model;
 Eigen::Affine3f g_affine_kinect_to_base;
+Eigen::Affine3f g_affine_kinect_to_head,g_affine_head_to_base;
 double g_z_plane_nom;
 double g_table_z_wrt_base;
 std::vector<int> g_indices_of_plane; //indices of patch that do not contain outliers 
 tf::StampedTransform g_kinect_sensor_to_base_link;
+tf::StampedTransform g_head_to_base_link,g_kinect_sensor_to_head_link;
 //void pcl_ros::transformPointCloud 	( 	const pcl::PointCloud< PointT > &  	cloud_in,
 //		pcl::PointCloud< PointT > &  	cloud_out,
 //		const tf::Transform &  	transform 
 //	) 	
 tf::Transform g_tf_kinect_sensor_to_base_link;
-
+tf::Transform g_tf_kinect_sensor_to_head_link;
+tf::Transform g_tf_head_to_base_link;
 // shortcut for now...later, object_finder should be a library
 #include "object_finder.cpp"
 
@@ -1201,14 +1206,22 @@ int main(int argc, char** argv) {
     tf::TransformListener tfListener;
     bool tferr = true;
     ROS_INFO("waiting for tf between kinect sensor and base...");
+    //PROBLEM: kinect driver on remote computer out of sync w/ master;
+    // try to fix this by finding separate transform for kinect_sensor to head (static), then head to torso
     while (tferr) {
         tferr = false;
         try {
+            ros::spinOnce();
             //try to lookup transform from target frame "base" to source frame "kinect_pc_frame"
             //The direction of the transform returned will be from the target_frame to the source_frame. 
             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
             // this version for physical Kinect
-            tfListener.lookupTransform("camera_rgb_optical_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
+            tfListener.lookupTransform("head", "torso", ros::Time(0), g_head_to_base_link);
+            tfListener.lookupTransform("camera_rgb_optical_frame", "head", ros::Time(0), g_kinect_sensor_to_head_link);
+            //g_head_to_base_link,g_kinect_sensor_to_head_link;
+            //tfListener.lookupTransform("camera_rgb_optical_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
+            //g_kinect_sensor_to_base_link = g_kinect_sensor_to_head_link*g_kinect_head_to_base_link;
+
 
             //tfListener.lookupTransform("kinect_pc_frame", "base", ros::Time(0), g_kinect_sensor_to_base_link);
         } catch (tf::TransformException &exception) {
@@ -1221,15 +1234,27 @@ int main(int argc, char** argv) {
     ROS_INFO("tf is good");
     // g_tf_kinect_sensor_to_base_link.setOrigin(tf::Vector3(g_kinect_sensor_to_base_link.pose.position.x, g_kinect_sensor_to_base_link.pose.position.y, g_kinect_sensor_to_base_link.pose.position.z));
     // extract transform from stamped transform:
-    g_tf_kinect_sensor_to_base_link.setOrigin(g_kinect_sensor_to_base_link.getOrigin());
-    g_tf_kinect_sensor_to_base_link.setRotation(g_kinect_sensor_to_base_link.getRotation());
-    transformTFToEigen(g_tf_kinect_sensor_to_base_link, g_affine_kinect_to_base);
+    // for some reason, Kinect transforms are out of sync;
+    // try to fix this by finding a static transform from sensor to head, but let head to torso by time varying
+    g_tf_kinect_sensor_to_head_link.setOrigin(g_kinect_sensor_to_head_link.getOrigin());
+    g_tf_kinect_sensor_to_head_link.setRotation(g_kinect_sensor_to_head_link.getRotation());
+    transformTFToEigen(g_tf_kinect_sensor_to_head_link, g_affine_kinect_to_head);
+    
+    g_tf_head_to_base_link.setOrigin(g_head_to_base_link.getOrigin());
+    g_tf_head_to_base_link.setRotation(g_head_to_base_link.getRotation());
+    transformTFToEigen(g_tf_head_to_base_link, g_affine_head_to_base);
+    
+    // had to cascade these in the following order...then use inverse of affine_kinect_to_base to transform pt into base frame
+    g_affine_kinect_to_base = g_affine_kinect_to_head*g_affine_head_to_base; //g_affine_head_to_base*g_affine_kinect_to_head;
+    //g_tf_kinect_sensor_to_base_link.setOrigin(g_kinect_sensor_to_base_link.getOrigin());
+    //g_tf_kinect_sensor_to_base_link.setRotation(g_kinect_sensor_to_base_link.getRotation());
+    //transformTFToEigen(g_tf_kinect_sensor_to_base_link, g_affine_kinect_to_base);    
     // Subscribers
     cout << "subscribing to kinect depth points" << endl;
     // Subscribers
     // use the following, if have "live" streaming from a Kinect
     ros::Subscriber getPCLPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/camera/depth_registered/points", 1, kinectCB);
-    ros::Subscriber getPCLPoints_sim = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB);
+    ros::Subscriber getPCLPoints_sim = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect/depth/points", 1, kinectCB); // this for gazebo
 
     cout << "subscribing to selected points" << endl;
 
@@ -1515,16 +1540,27 @@ int main(int argc, char** argv) {
                     break;
 
                 case PCL_FIND_COKE_FRAME:
-                    affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, default_table_z_height_wrt_baxter_base_frame);
+                    ROS_INFO("case PCL_FIND_COKE_FRAME");
+                    z_table = object_finder.get_table_height();     
+                    
+                    //affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, default_table_z_height_wrt_baxter_base_frame);
+                    affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, indices_object_top,z_table);
 
+                    copy_cloud(g_pclKinect, indices_object_top, g_display_cloud);
+                    pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
+                    g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    ros::spinOnce();
                     // debug output:
                     model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
                     ROS_INFO("coke can model frame w/rt base: %f, %f, %f \n ", model_frame_origin(0), model_frame_origin(1), model_frame_origin(2));
                     cout << "R = " << endl;
                     cout << affine_model_frame_wrt_baxter_base.linear() << endl;
                     g_A_model_wrt_base = eigen_affine_3d_to_3f(affine_model_frame_wrt_baxter_base); // this value will be available for service to report out
+                    cout << "g_A_model_wrt_base origin: " << g_A_model_wrt_base.translation().transpose() << endl;
                     g_status = PCL_STATUS_IDLE;
                     break;
+                    
                 case PCL_FIND_GAZEBO_BEER_FRAME:
                     ROS_INFO("case PCL_FIND_GAZEBO_BEER_FRAME");
                     z_table = object_finder.get_table_height();
@@ -1556,7 +1592,15 @@ int main(int argc, char** argv) {
                     g_A_grasp_wrt_base = g_A_model_wrt_base*g_A_grasp_wrt_model;
                     g_status = PCL_STATUS_IDLE;
                     break;
+                case PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME:
+                    ROS_INFO("case PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME");
+                    g_A_grasp_wrt_model = object_finder.get_grasp_transform_coke_can_grasp_from_above();
+                    grasp_origin_wrt_model = g_A_grasp_wrt_model.translation();
 
+                    ROS_INFO("grasp offset w/rt model: %f, %f, %f",grasp_origin_wrt_model[0],grasp_origin_wrt_model[1],grasp_origin_wrt_model[2]);
+                    g_A_grasp_wrt_base = g_A_model_wrt_base*g_A_grasp_wrt_model;
+                    g_status = PCL_STATUS_IDLE;                    
+                    break;
 
 
                 case PCL_FIND_ON_TABLE:

@@ -649,7 +649,7 @@ int main(int argc, char** argv) {
                         traj_streamer_action_client.sendGoal(goal, &doneCb); // we could also name additional callback functions here, if desired
                         //    action_client.sendGoal(goal, &doneCb, &activeCb, &feedbackCb); //e.g., like this
 
-                        finished_before_timeout = traj_streamer_action_client.waitForResult(ros::Duration(5.0));
+                        finished_before_timeout = traj_streamer_action_client.waitForResult(ros::Duration(20.0));
 
                         if (!finished_before_timeout) {
                             ROS_WARN("EXECUTE_PLANNED_PATH: giving up waiting on result");

@@ -38,6 +38,7 @@ Baxter_traj_streamer::Baxter_traj_streamer(ros::NodeHandle* nodehandle){
    }    
   
     qdot_max_vec<<q0dotmax,q1dotmax,q2dotmax,q3dotmax,q4dotmax,q5dotmax,q6dotmax;
+    qdot_max_vec *=SPEED_SCALE_FACTOR;
     
    traj_interp_stat_client_ = nh_.serviceClient<cwru_srv::simple_bool_service_message>("trajInterpStatusSvc");
 
