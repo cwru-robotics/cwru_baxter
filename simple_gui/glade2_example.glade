@@ -144,23 +144,11 @@
           </packing>
         </child>
         <child>
-          <object class="GtkButton" id="plane_to_pre_pose">
-            <property name="label" translatable="yes">compute move to waiting pose</property>
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="receives_default">True</property>
-            <property name="use_action_appearance">False</property>
-            <signal name="clicked" handler="plan_to_pre_pose_cb" swapped="no"/>
-          </object>
-          <packing>
-            <property name="expand">True</property>
-            <property name="fill">True</property>
-            <property name="position">9</property>
-          </packing>
+          <placeholder/>
         </child>
         <child>
           <object class="GtkButton" id="compute_jspace_move_to_waiting_pose">
-            <property name="label" translatable="yes">compute jspace move to waiting pose</property>
+            <property name="label" translatable="yes">go to waiting pose</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
@@ -175,7 +163,7 @@
         </child>
         <child>
           <object class="GtkButton" id="plan_descend_20cm">
-            <property name="label" translatable="yes">plan descend 20cm</property>
+            <property name="label" translatable="yes">descend 20cm</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
@@ -190,7 +178,7 @@
         </child>
         <child>
           <object class="GtkButton" id="plan_ascend_20cm">
-            <property name="label" translatable="yes">plan ascend 20cm</property>
+            <property name="label" translatable="yes">ascend 20cm</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="receives_default">True</property>
@@ -276,6 +264,22 @@
             <property name="expand">True</property>
             <property name="fill">True</property>
             <property name="position">17</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="grab_coke_can">
+            <property name="label" translatable="yes">get Coke can</property>
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="receives_default">True</property>
+            <property name="use_action_appearance">False</property>
+            <property name="relief">none</property>
+            <signal name="clicked" handler="grab_coke_can_cb" swapped="no"/>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">18</property>
           </packing>
         </child>
       </object>

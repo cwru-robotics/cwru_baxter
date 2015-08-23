@@ -9,6 +9,7 @@
 #include<std_msgs/Float32.h>
 #include<geometry_msgs/PoseStamped.h>
 #include<std_msgs/Bool.h>
+#include <std_msgs/Float64.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,6 +65,7 @@ const int RQST_PREVIEW_TRAJECTORY=12;
 
 const int RQST_GRAB_COKE_CAN_FROM_ABOVE=13;
 const int RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE=14;
+const int RQST_MOVE_MARKER_TO_MODEL_FRAME = 15;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -122,6 +124,7 @@ const int PCL_FIND_FLOOR = 11;
 const int PCL_FIND_TABLE = 12;
 const int PCL_INQUIRE_STATUS = 13;
 const int PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME = 14;
+const int PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME = 15;
 
 const int PCL_STATUS_BUSY = 1;
 const int PCL_STATUS_IDLE = 0;
@@ -190,6 +193,7 @@ geometry_msgs::PoseStamped get_model_pose_wrt_torso(int cmd_mode) {
     ROS_INFO("requesting pose from pcl_perception: ");
     g_pcl_getframe_msg.request.cmd_mode = cmd_mode; // modes 1 or 2: frame in kinect coords (1) or torso (2)
     bool status = g_pcl_getframe_svc_client.call(g_pcl_getframe_msg);
+    if (status!=true) ROS_WARN("getframe service client failure!");
     geometry_msgs::PoseStamped pose_from_pcl, pose_wrt_torso;
     pose_from_pcl = g_pcl_getframe_msg.response.poseStamped_IM_current;
     ROS_INFO("got current model pose: x,y,z = %f, %f, %f",
@@ -265,6 +269,19 @@ geometry_msgs::Quaternion quaternion_from_R(Eigen::Matrix3d R) {
     return quat_msg;
 }
 
+/*
+ G_MODULE_EXPORT void open_gripper_cb(GtkButton *open_gripper, gpointer data) 
+{
+  printf("opening gripper\n");
+  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -4.0"); //angle pi rot of motor--pretty much fully open fingers
+}
+
+G_MODULE_EXPORT void close_gripper_cb(GtkButton *close_gripper, gpointer data) 
+{
+  printf("closing gripper\n");
+  system("rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -1.1"); // angle 90deg rot of motor; should be OK to pick up can
+}*/
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "coordinator");
     ros::NodeHandle nh; //standard ros node handle   
@@ -273,7 +290,7 @@ int main(int argc, char **argv) {
 
     geometry_msgs::Pose pose;
     geometry_msgs::PoseStamped poseStamped;
-    geometry_msgs::PoseStamped pose_from_pcl, model_pose_wrt_torso,grasp_pose_wrt_model, grasp_pose_wrt_torso;
+    geometry_msgs::PoseStamped pose_from_pcl, model_pose_wrt_torso,grasp_pose_wrt_model, grasp_pose_wrt_torso, approach_pose_wrt_torso;
     Eigen::Affine3f A_grasp_wrt_model;
     Eigen::Vector3d n_des, t_des, b_des;
     b_des << 0, 0, -1;
@@ -294,10 +311,16 @@ int main(int argc, char **argv) {
     tf::TransformListener tfListener;
     g_tfListener_ptr = &tfListener;
     
-    tf::StampedTransform tf_kinect_wrt_torso;
+    ros::Publisher gripper_intfc = nh.advertise<std_msgs::Float64>("/tilt_controller/command", 1);
+    std_msgs::Float64 gripper_open;
+    gripper_open.data = -4.0; //-4 rad opens fingers ~ maximally
+    std_msgs::Float64 gripper_close_can;
+    gripper_close_can.data = -1.1; //tune for grasp of Coke can
+    gripper_intfc.publish(gripper_open); // publish the value--of type Float64-- 
+    //tf::StampedTransform tf_kinect_wrt_torso;
 
     // wait to start receiving valid tf transforms 
-    /**/
+    /*
     bool tferr = true;
     ROS_INFO("waiting for tf between kinect: camera_depth_optical_frame and torso...");
     while (tferr) {
@@ -315,7 +338,7 @@ int main(int argc, char **argv) {
         }
     }
     ROS_INFO("tf is good");
-
+*/
     //communicate with node interactive_marker_node interactive_marker_node
     ROS_INFO("setting up a service client of rt_hand_marker");
     ros::ServiceClient IM_6dof_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("IM6DofSvc");
@@ -405,6 +428,9 @@ int main(int argc, char **argv) {
                     g_arm_interface_svc_client.call(arm_nav_msg);
                     if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
                         ROS_INFO("computed a valid path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
                     }                   
                     break;
                 case  RQST_PREVIEW_TRAJECTORY:
@@ -425,12 +451,26 @@ int main(int argc, char **argv) {
                     arm_nav_msg.request.cmd_mode= ARM_DESCEND_20CM;     
                     g_arm_interface_svc_client.call(arm_nav_msg);  
                     arm_server_busy_wait_done();
+                    arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    arm_server_busy_wait_done();
                     break;
                  case RQST_ASCEND_20CM:
                     ROS_INFO("case RQST_ASCEND_20CM");
                     arm_nav_msg.request.cmd_mode= ARM_DEPART_20CM;     
                     g_arm_interface_svc_client.call(arm_nav_msg);   
                     arm_server_busy_wait_done();
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }                    
+                    else {
+                        ROS_WARN("did not compute a valid path to grasp pose");
+                        break;        
+                    }     
                     break;
                     
                 case RQST_COMPUTE_MOVE_ARM_TO_APPROACH_POSE:
@@ -469,11 +509,105 @@ int main(int argc, char **argv) {
                         ROS_WARN("did not compute a valid path");
                     break;
                     /**/
+
                 case RQST_GRAB_COKE_CAN_FROM_ABOVE:
-                    g_pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;
-                    model_pose_wrt_torso = get_model_pose_wrt_torso(2); // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
+                    ROS_INFO("rqst take snapshot");
+                    g_pcl_perception_msg.request.req = PCL_TAKE_SNAPSHOT; 
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find floor");
+                    g_pcl_perception_msg.request.req = PCL_FIND_FLOOR;  
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find table");
+                    g_pcl_perception_msg.request.req = PCL_FIND_TABLE;  
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    ROS_INFO("rqst find coke can frame");
+                    g_pcl_perception_msg.request.req = PCL_FIND_COKE_FRAME;   
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
                     
+                    ROS_INFO("requesting model frame from perception service");                    
+                    pose_from_pcl = get_model_pose_wrt_torso(PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO); // mode 2--model frame in base coords
+                    // put the marker coincident with the model frame:
+                    pose_from_pcl.header.stamp = ros::Time::now();
+                    ROS_INFO("requesting set new marker pose coincident w/ model frame");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = pose_from_pcl;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);    
+                   /* */
+                    g_pcl_perception_msg.request.req = PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME;
+                    g_pcl_perception_svc_client.call(g_pcl_perception_msg);
+                    perception_busy_wait_done();
+                    grasp_pose_wrt_torso = get_model_pose_wrt_torso(PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_TORSO);
+                    approach_pose_wrt_torso = grasp_pose_wrt_torso;
+                    approach_pose_wrt_torso.pose.position.z += 0.05; // add vertical offset for approach from above
+                    // move marker here:
+                    ROS_INFO("requesting set new marker pose coincident w/ grasp frame");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = grasp_pose_wrt_torso;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                        
+                    /**/
+                    ROS_INFO("requesting set new marker to approach pose: ");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = approach_pose_wrt_torso;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                     
+                    //grasp_pose_wrt_model = get_grasp_transform; // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
+                    
+                    arm_nav_msg.request.poseStamped_goal = approach_pose_wrt_torso;
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE;  
+                    g_arm_interface_svc_client.call(arm_nav_msg);           
+                    wait_done=arm_server_busy_wait_done(); 
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }
+                    else {
+                        ROS_WARN("did not compute a valid path");
+                        break;        
+                    }
+                    
+                    // move to grasp pose:
+                    arm_nav_msg.request.poseStamped_goal = grasp_pose_wrt_torso;
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE;  
+                    g_arm_interface_svc_client.call(arm_nav_msg);           
+                    wait_done=arm_server_busy_wait_done(); 
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }                    
+                    else {
+                        ROS_WARN("did not compute a valid path to grasp pose");
+                        break;        
+                    }     
+                    gripper_intfc.publish(gripper_close_can);
+
                     break;
+                    
+                case RQST_MOVE_MARKER_TO_MODEL_FRAME:
+                    ROS_INFO("requesting model frame from perception service");                    
+                    pose_from_pcl = get_model_pose_wrt_torso(PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO); // mode 2--model frame in base coords
+                    // put the marker coincident with the model frame:
+                    pose_from_pcl.header.stamp = ros::Time::now();
+                    ROS_INFO("requesting set new marker pose coincident w/ model frame");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = pose_from_pcl;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                        
+                    break;
+
                 case RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE:
                     ROS_INFO("rqst take snapshot");
                     g_pcl_perception_msg.request.req = PCL_TAKE_SNAPSHOT; 
@@ -487,7 +621,7 @@ int main(int argc, char **argv) {
                     g_pcl_perception_msg.request.req = PCL_FIND_TABLE;  
                     g_pcl_perception_svc_client.call(g_pcl_perception_msg);
                     perception_busy_wait_done();
-                    ROS_INFO("rqst find gazebo beer frame");
+                    ROS_INFO("rqst find coke can frame");
                     g_pcl_perception_msg.request.req = PCL_FIND_GAZEBO_BEER_FRAME;   
                     g_pcl_perception_svc_client.call(g_pcl_perception_msg);
                     perception_busy_wait_done();
@@ -513,6 +647,7 @@ int main(int argc, char **argv) {
                     //grasp_pose_wrt_model = get_grasp_transform; // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
                      
                     break;
+                    
                 default:
                     ROS_WARN("this mode is not implemented");
 
