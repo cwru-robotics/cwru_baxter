@@ -1,0 +1,21 @@
+things to clone for baxter/ROS compatibility
+under ros_ws/src:  
+
+get cwru_baxter (this repo)
+
+create a "rethink" directory under "/src";
+install these packages from github.com/rethinkrobotics
+baxter_common, baxter_interface, baxter_simulator, baxter_tools
+
+also, install catkin_simple
+
+get external pkgs as well (cwru repo)
+
+get ros_class (wsn repo)
+https://github.com/wsnewman/ros_class
+
+
+
+
+
+
