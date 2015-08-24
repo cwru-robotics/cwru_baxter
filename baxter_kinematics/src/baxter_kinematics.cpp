@@ -614,13 +614,13 @@ int Baxter_IK_solver::ik_solve_approx_wrt_torso_given_qs0(Eigen::Affine3d const&
 }
 
 
-// assumes desired_hand_pose is w/rt D-H frame 0;
-//major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_hand_pose
+// assumes desired_flange_pose is w/rt D-H frame 0;
+//major fnc: samples values of q_s0 at resolution DQS0 to compute a vector of viable, approximate solutions to IK of desired_flange_pose
 // for WRIST ONLY; ignores last 3DOF's
 // for solutions of interest, can subsequently refine the precision of these with precise_soln_q123, etc.
 int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_flange_pose,std::vector<Vectorq7x1> &q_solns_123) // given desired hand pose, find all viable IK solns for wrist pt
 { 
-  double q_s0_ctr = compute_qs0_ctr(desired_hand_pose);
+  double q_s0_ctr = compute_qs0_ctr(desired_flange_pose);
   //cout<<"ik_solve_approx: q_s0_ctr = "<<q_s0_ctr<<endl;
   double dqs0 = DQS0; // search resolution on dq0
   double  q_s0 = q_s0_ctr;
@@ -629,14 +629,14 @@ int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_flang
   int nsolns=0;
   q_solns.clear(); // fill in all valid solns in this list
   q_solns_123.clear();  
-  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_flange_wrt_rarm_mount(desired_hand_pose);
+  Eigen::Vector3d w_des_wrt_0 = wrist_frame0_from_flange_wrt_rarm_mount(desired_flange_pose);
   Eigen::Affine3d A_fwd_DH;  
   Eigen::Matrix4d A_wrist;
-  Eigen::Matrix3d Rdes = desired_hand_pose.linear();
+  Eigen::Matrix3d Rdes = desired_flange_pose.linear();
   bool reachable = true;  
   while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        reachable = compute_q123_solns(desired_flange_pose, q_s0, q_solns_of_qs0); 
         
         if (reachable ) {
             //test these solns:
@@ -666,7 +666,7 @@ int Baxter_IK_solver::ik_wrist_solve_approx(Eigen::Affine3d const& desired_flang
     //q_solns_123.clear();
     while (reachable) { 
         //cout<<"try q_s0 = "<<q_s0<<endl;
-        reachable = compute_q123_solns(desired_hand_pose, q_s0, q_solns_of_qs0); 
+        reachable = compute_q123_solns(desired_flange_pose, q_s0, q_solns_of_qs0); 
         if (reachable ) {
             //test these solns:
             //cout<<"test: des w_wrt_0 = "<<w_des_wrt_0.transpose()<<endl;
