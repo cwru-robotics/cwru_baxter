@@ -1598,7 +1598,7 @@
       <update_rate>100.0</update_rate>
     </sensor>
   </gazebo>
-  <!-- wsn--add kinect sensor emulation-->
+  <!-- wsn: add kinect sensor emulation-->
 <gazebo reference="kinect_link">
     <sensor type="depth" name="openni_camera_camera">       
         <always_on>1</always_on>
