@@ -1,5 +1,5 @@
 <launch>
-<!-- assume either baxter_gazebo or real baxter is running /-->
+<!-- assume either baxter_gazebo or real baxter is running  /-->
 <!-- in either case, the robot model should be loaded on the parameter server before this launch file is run -->
 <!--include file ="$(find baxter_gazebo)/launch/baxter_world.launch"/-->
   <!-- Load the URDF into the ROS Parameter Server -->

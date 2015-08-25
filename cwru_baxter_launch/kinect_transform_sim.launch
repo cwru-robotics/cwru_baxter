@@ -1,5 +1,5 @@
 <launch>
-<!-- need camera link for Kinect driver -->
+<!-- need camera link for Kinect driver  -->
 
 <!-- make this tf external for tuning -->
 <!-- this version for simu...still use camera_rgb_optical_frame-->
