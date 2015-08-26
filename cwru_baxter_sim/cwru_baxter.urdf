@@ -14,7 +14,7 @@
     <child link="base"/>
   </joint>
 
-  <link name="torso">
+  <link name="torso"> 
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
