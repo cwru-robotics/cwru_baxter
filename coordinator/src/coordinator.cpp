@@ -552,6 +552,8 @@ int main(int argc, char **argv) {
                     arm_nav_msg.request.cmd_mode= ARM_DESCEND_20CM;     
                     g_arm_interface_svc_client.call(arm_nav_msg);  
                     arm_server_busy_wait_done();
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
                     if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
                         ROS_INFO("computed a valid path");
                         ROS_INFO("requesting execution of planned path");
@@ -569,6 +571,8 @@ int main(int argc, char **argv) {
                     arm_nav_msg.request.cmd_mode= ARM_DEPART_20CM;     
                     g_arm_interface_svc_client.call(arm_nav_msg);   
                     arm_server_busy_wait_done();
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
                     if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
                         ROS_INFO("computed a valid path");
                         ROS_INFO("requesting execution of planned path");
