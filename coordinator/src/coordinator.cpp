@@ -66,6 +66,7 @@ const int RQST_PREVIEW_TRAJECTORY=12;
 const int RQST_GRAB_COKE_CAN_FROM_ABOVE=13;
 const int RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE=14;
 const int RQST_MOVE_MARKER_TO_MODEL_FRAME = 15;
+const int RQST_MOVE_MARKER_TO_HAND_POSE = 16;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -177,6 +178,41 @@ Eigen::Affine3f affine3f_from_poseStamped(geometry_msgs::PoseStamped poseStamped
     return affine_result;
 }
 
+ geometry_msgs::Pose transformEigenAffine3fToPose(Eigen::Affine3f e) {
+    Eigen::Vector3f Oe;
+    Eigen::Matrix3f Re;
+    geometry_msgs::Pose pose;
+    Oe = e.translation();
+    Re = e.linear();
+
+    Eigen::Quaternionf q(Re); // convert rotation matrix Re to a quaternion, q
+    pose.position.x = Oe(0);
+    pose.position.y = Oe(1);
+    pose.position.z = Oe(2);
+
+    pose.orientation.x = q.x();
+    pose.orientation.y = q.y();
+    pose.orientation.z = q.z();
+    pose.orientation.w = q.w();
+    
+    return pose;
+}
+
+
+//given a transform, convert this to an affine3f
+void transformTFToEigen(const tf::Transform &t, Eigen::Affine3f &e) {
+    for (int i = 0; i < 3; i++) {
+        e.matrix()(i, 3) = t.getOrigin()[i];
+        for (int j = 0; j < 3; j++) {
+            e.matrix()(i, j) = t.getBasis()[i][j];
+        }
+    }
+    // Fill in identity in last row
+    for (int col = 0; col < 3; col++)
+        e.matrix()(3, col) = 0;
+    e.matrix()(3, 3) = 1;
+}
+
 
 Eigen::Affine3f get_grasp_transform() {
     g_pcl_getframe_msg.request.cmd_mode = PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_MODEL; // modes 1 or 2: frame in kinect coords (1) or torso (2)
@@ -212,6 +248,41 @@ geometry_msgs::PoseStamped get_model_pose_wrt_torso(int cmd_mode) {
     ROS_INFO("origin: %f, %f, %f", pose_wrt_torso.pose.position.x, pose_wrt_torso.pose.position.y, pose_wrt_torso.pose.position.z);
     ROS_INFO("orientation: %f, %f, %f, %f", pose_wrt_torso.pose.orientation.x, pose_wrt_torso.pose.orientation.y, pose_wrt_torso.pose.orientation.z, pose_wrt_torso.pose.orientation.w);
     return pose_wrt_torso;
+}
+
+Eigen::Affine3f  get_yale_gripper_affine_wrt_torso() {
+    geometry_msgs::PoseStamped poseStamped;
+
+    
+    ROS_INFO("getting gripper pose: ");
+    //g_pcl_getframe_msg.request.cmd_mode = cmd_mode; // modes 1 or 2: frame in kinect coords (1) or torso (2)
+    //bool status = g_pcl_getframe_svc_client.call(g_pcl_getframe_msg);
+    //if (status!=true) ROS_WARN("getframe service client failure!");
+    geometry_msgs::PoseStamped pose_wrt_torso;
+    tf::StampedTransform tf_right_hand_wrt_torso;
+    Eigen::Affine3f yale_gripper_affine_wrt_torso;
+    
+    bool tferr = true;
+    ROS_INFO("waiting for tf between yale gripper frame and torso...");
+    while (tferr) {
+        tferr = false;
+        try {
+
+            //The direction of the transform returned will be from the target_frame to the source_frame. 
+            //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
+            //g_tfListener_ptr->lookupTransform("yale_gripper_frame", "torso", ros::Time(0), tf_right_hand_wrt_torso);
+            g_tfListener_ptr->lookupTransform("torso", "yale_gripper_frame", ros::Time(0), tf_right_hand_wrt_torso);
+
+        } catch (tf::TransformException &exception) {
+            ROS_WARN("%s", exception.what());
+            tferr = true;
+            ros::Duration(0.1).sleep(); // sleep briefly
+            ros::spinOnce();
+        }
+    }
+    ROS_INFO("got gripper tf");
+    transformTFToEigen(tf_right_hand_wrt_torso, yale_gripper_affine_wrt_torso);
+    return yale_gripper_affine_wrt_torso;
 }
 
 bool arm_server_busy_wait_done() {
@@ -291,6 +362,8 @@ int main(int argc, char **argv) {
     geometry_msgs::Pose pose;
     geometry_msgs::PoseStamped poseStamped;
     geometry_msgs::PoseStamped pose_from_pcl, model_pose_wrt_torso,grasp_pose_wrt_model, grasp_pose_wrt_torso, approach_pose_wrt_torso;
+    geometry_msgs::Pose yale_gripper_pose_wrt_torso; 
+
     Eigen::Affine3f A_grasp_wrt_model;
     Eigen::Vector3d n_des, t_des, b_des;
     b_des << 0, 0, -1;
@@ -306,8 +379,9 @@ int main(int argc, char **argv) {
     
     //define a pre-pose in this node; note--may not be same as pre-pose in arm interface node
     Eigen::Matrix<double, 7, 1> coord_pre_pose;
-    coord_pre_pose<< -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, -2.87179;   
-    
+    //coord_pre_pose<< -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, -2.87179;   
+    coord_pre_pose<< -0.907528, -0.111813, 2.06622, 1.8737, -1.295, 2.00164, 0; 
+      
     tf::TransformListener tfListener;
     g_tfListener_ptr = &tfListener;
     
@@ -318,18 +392,22 @@ int main(int argc, char **argv) {
     gripper_close_can.data = -1.1; //tune for grasp of Coke can
     gripper_intfc.publish(gripper_open); // publish the value--of type Float64-- 
     //tf::StampedTransform tf_kinect_wrt_torso;
+    tf::StampedTransform tf_right_hand_wrt_torso; 
+    
+    Eigen::Affine3f yale_gripper_affine_wrt_torso;
 
     // wait to start receiving valid tf transforms 
-    /*
+    
+
     bool tferr = true;
-    ROS_INFO("waiting for tf between kinect: camera_depth_optical_frame and torso...");
+    ROS_INFO("waiting for tf between yale gripper frame and torso...");
     while (tferr) {
         tferr = false;
         try {
 
             //The direction of the transform returned will be from the target_frame to the source_frame. 
             //Which if applied to data, will transform data in the source_frame into the target_frame. See tf/CoordinateFrameConventions#Transform_Direction
-            tfListener.lookupTransform("camera_depth_optical_frame", "torso", ros::Time(0), tf_kinect_wrt_torso);
+            g_tfListener_ptr->lookupTransform("yale_gripper_frame", "torso", ros::Time(0), tf_right_hand_wrt_torso);
         } catch (tf::TransformException &exception) {
             ROS_ERROR("%s", exception.what());
             tferr = true;
@@ -338,7 +416,7 @@ int main(int argc, char **argv) {
         }
     }
     ROS_INFO("tf is good");
-*/
+
     //communicate with node interactive_marker_node interactive_marker_node
     ROS_INFO("setting up a service client of rt_hand_marker");
     ros::ServiceClient IM_6dof_svc_client = nh.serviceClient<cwru_srv::IM_node_service_message>("IM6DofSvc");
@@ -389,6 +467,29 @@ int main(int argc, char **argv) {
                             IM_6dof_srv_msg.response.poseStamped_IM_current.pose.position.y,
                             IM_6dof_srv_msg.response.poseStamped_IM_current.pose.position.z);*/
                     break;
+                    
+                case RQST_MOVE_MARKER_TO_HAND_POSE:
+                    ROS_INFO("case RQST_MOVE_MARKER_TO_HAND_POSE");  
+                    yale_gripper_affine_wrt_torso  =get_yale_gripper_affine_wrt_torso(); 
+                    //obtain current right gripper frame
+                    yale_gripper_pose_wrt_torso =  transformEigenAffine3fToPose(yale_gripper_affine_wrt_torso);
+
+                    // put the marker origin coincident with current gripper frame;
+                    //pose = model_pose_wrt_torso.pose;
+                    //pose.position.z += H_CYLINDER;
+                    //pose.orientation = quat_gripper_down; // coerce orientation to point down
+                    
+                    poseStamped.pose = yale_gripper_pose_wrt_torso;
+                    poseStamped.header.stamp = ros::Time::now();
+                    poseStamped.header.frame_id= "torso";
+                    
+                    
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = poseStamped;
+                    ROS_INFO("placing IM at coincident with gripper frame");
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                    
+                    break;
+                    
                 case RQST_DISPLAY_REACHABILITY_AT_MARKER_HEIGHT:
                     IM_6dof_srv_msg.request.cmd_mode = IM_GET_CURRENT_MARKER_POSE;
                     status = IM_6dof_svc_client.call(IM_6dof_srv_msg);
@@ -451,9 +552,17 @@ int main(int argc, char **argv) {
                     arm_nav_msg.request.cmd_mode= ARM_DESCEND_20CM;     
                     g_arm_interface_svc_client.call(arm_nav_msg);  
                     arm_server_busy_wait_done();
-                    arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
-                    g_arm_interface_svc_client.call(arm_nav_msg);
-                    arm_server_busy_wait_done();
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }                    
+                    else {
+                        ROS_WARN("did not compute a valid path to grasp pose");
+                        break;        
+                    }                     
                     break;
                  case RQST_ASCEND_20CM:
                     ROS_INFO("case RQST_ASCEND_20CM");
@@ -504,10 +613,15 @@ int main(int argc, char **argv) {
                     g_arm_interface_svc_client.call(arm_nav_msg);
                     if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
                         ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();                        
                     }
                     else
                         ROS_WARN("did not compute a valid path");
                     break;
+                    
                     /**/
 
                 case RQST_GRAB_COKE_CAN_FROM_ABOVE:

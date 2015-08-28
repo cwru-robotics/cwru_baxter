@@ -1,3 +1,6 @@
+// compile with:  gcc -o service_call_gui service_call_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
+// must do this from directory simple_gui, so it can find the glade file glade2_example.glade
+
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdio.h> 
@@ -84,6 +87,13 @@ G_MODULE_EXPORT void move_IM_to_grasp_pose_cb(GtkButton *move_IM_to_grasp_pose, 
 {
   printf("move IM to grasp pose: \n");
   system("rosservice call coordinator_svc 7");
+
+}
+
+G_MODULE_EXPORT void move_marker_to_hand_pose_cb(GtkButton *move_marker_to_hand_pose, gpointer data) 
+{
+  printf("move IM to hand pose: \n");
+  system("rosservice call coordinator_svc 16");
 
 }
 
