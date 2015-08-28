@@ -1,0 +1,59 @@
+recap Baxter start-up:
+SET REMOTE MASTER TO BAXTER:
+1) power up Baxter
+2) create some terminals w/ remote master:  
+	source ~/ros_ws/src/cwru_baxter/cwru_baxter_launch/set_remote_master.sh 
+   or:  export ROS_MASTER_URI="http://baxter01:11311"
+   or:  baxter_master
+   for the following, use windows w/ remote master set
+
+START KINECT: (try mapping "kinect_pc_frame" for compatibility w/ simu--needs testing)
+1) start the kinect driver (for Kinect v1) and remap frame names:
+	roslaunch freenect_launch freenect.launch rgb_frame_id:=camera_rgb_optical_frame depth_frame_id:=camera_depth_optical_frame
+ VS:  	roslaunch freenect_launch freenect.launch rgb_frame_id:=kinect_pc_frame depth_frame_id:=camera_depth_optical_frame
+2) start publishing transforms to specify Kinect frame relative to robot head:
+	roslaunch cwru_baxter_launch kinect_transform.launch  
+     (NOTE: included in cwru_baxter_nodes.launch)
+
+START RVIZ/ TEST KINECT  
+1) rosrun rviz rviz
+2)   set pointcloud2 topic to: /camera/depth/points
+  should see rviz display of Kinect points, including "lint" on robot arms
+  may choose fixed frame as "floor" if desired
+  NOTE: frame for topic /camera/depth/points is: camera_depth_optical_frame
+
+START HAND:
+1) start the dynamixel motor controller manager:
+	roslaunch motor_controller controller_manager.launch
+   should respond with:  pan_tilt_port: Found 1 motors - 1 MX-64 [1], initialization complete.
+    (and keep running)
+2) run: 
+  roslaunch motor_controller tilt_controller.launch
+    sets parameters?  (runs to conclusion; may re-use window)
+  TEST w/: rostopic pub -1 /tilt_controller/command std_msgs/Float64 -- -3.5
+3) start yale hand transform publisher: (if do not use cwru_baxter_nodes.launch)
+  roslaunch cwru_baxter_launch yale_gripper_xform.launch
+     (NOTE: included in cwru_baxter_nodes.launch)
+
+note on gripper commands: may vary as tendons slip;  
+  on 8/8/15, command of -1.0 is OK for grasping Pepsi bottle
+
+START GUI:
+  roscd simple_gui;  ./service_call_gui; 
+  test gripper w/: "open gripper" and "close gripper" buttons
+
+LAUNCH CWRU_BAXTER NODES: NOTE--launch file includes above static transform publishers (including def of "floor")
+<node pkg="reachability" type="reachability_from_above_v2" name="reachability_from_above_v2"/>
+<node pkg="baxter_traj_streamer" type="traj_interpolator_as" name="traj_interpolator_as"/>
+<node pkg="cartesian_moves" type="arm_motion_interface" name="arm_motion_interface"/>
+
+<node pkg="interactive_marker_node" type="interactive_marker_node" name="interactive_marker_node"/>
+<node pkg="coordinator" type="coordinator" name="coordinator"/>
+<node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/>
+
+These are launched by:
+  roslaunch cwru_baxter_launch cwru_baxter_nodes.launch
+
+
+
+
