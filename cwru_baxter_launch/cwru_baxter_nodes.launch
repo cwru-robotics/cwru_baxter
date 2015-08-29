@@ -15,8 +15,8 @@
 
 <node pkg="interactive_marker_node" type="interactive_marker_node" name="interactive_marker_node"/>
 <node pkg="coordinator" type="coordinator" name="coordinator"/>
-<!--node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node2"/-->
-<node pkg="pcl_perception_node" type="bed_of_nails_node" name="bed_of_nails_node"/>
+<!--node pkg="pcl_perception_node" type="pcl_perception_node2" name="pcl_perception_node"/-->
+<node pkg="pcl_perception_node" type="bed_of_nails_node" name="pcl_perception_node"/>
 
 <!-- tool transform publisher -->
 <include file ="$(find cwru_baxter_launch)/yale_gripper_xform.launch"/>

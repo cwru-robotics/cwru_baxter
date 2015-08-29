@@ -67,6 +67,7 @@ const int RQST_GRAB_COKE_CAN_FROM_ABOVE=13;
 const int RQST_GRAB_GAZEBO_BEER_CAN_FROM_ABOVE=14;
 const int RQST_MOVE_MARKER_TO_MODEL_FRAME = 15;
 const int RQST_MOVE_MARKER_TO_HAND_POSE = 16;
+const int RQST_GRAB_SHIRT_FROM_STOOL = 17;
 
 //service codes to send to arm interface: these are in cartesian_moves/arm_motion_interface_defs.h
 cwru_srv::arm_nav_service_message arm_nav_msg;
@@ -388,8 +389,9 @@ int main(int argc, char **argv) {
     ros::Publisher gripper_intfc = nh.advertise<std_msgs::Float64>("/tilt_controller/command", 1);
     std_msgs::Float64 gripper_open;
     gripper_open.data = -4.0; //-4 rad opens fingers ~ maximally
-    std_msgs::Float64 gripper_close_can;
+    std_msgs::Float64 gripper_close_can, gripper_close_shirt;
     gripper_close_can.data = -1.1; //tune for grasp of Coke can
+    gripper_close_shirt.data = -0.5;
     gripper_intfc.publish(gripper_open); // publish the value--of type Float64-- 
     //tf::StampedTransform tf_kinect_wrt_torso;
     tf::StampedTransform tf_right_hand_wrt_torso; 
@@ -433,9 +435,11 @@ int main(int argc, char **argv) {
     
     std::vector<Eigen::Affine3d> grasp_xforms; //vector to hold object grasp frame options    
     Object_grasp_frame_computer object_grasp_frame_computer; // create a grasp-frame computer object
-
+    Eigen::Vector3f axis;
     bool wait_done=true;
     geometry_msgs::Quaternion quaternion;
+    
+    
     while (ros::ok()) {
         if (g_trigger) {
             g_trigger = false; // reset the trigger
@@ -486,8 +490,21 @@ int main(int argc, char **argv) {
                     
                     IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
                     IM_6dof_srv_msg.request.poseStamped_IM_desired = poseStamped;
-                    ROS_INFO("placing IM at coincident with gripper frame");
-                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                    
+                    ROS_INFO("placing IM coincident with gripper frame");
+                    ROS_INFO("hand frame x,y,z = %f, %f, %f", yale_gripper_pose_wrt_torso.position.x,
+                            yale_gripper_pose_wrt_torso.position.y,yale_gripper_pose_wrt_torso.position.z);
+                    ROS_INFO("hand frame quat: : %f, %f, %f, %f",yale_gripper_pose_wrt_torso.orientation.x,
+                            yale_gripper_pose_wrt_torso.orientation.y,
+                            yale_gripper_pose_wrt_torso.orientation.z,
+                            yale_gripper_pose_wrt_torso.orientation.w);
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);   
+
+                    axis = yale_gripper_affine_wrt_torso.linear().col(0);
+                    ROS_INFO("x-axis: %f, %f, %f",axis(0),axis(1),axis(2));
+                    axis = yale_gripper_affine_wrt_torso.linear().col(1);
+                    ROS_INFO("y-axis: %f, %f, %f",axis(0),axis(1),axis(2));
+                    axis = yale_gripper_affine_wrt_torso.linear().col(2);
+                    ROS_INFO("z-axis: %f, %f, %f",axis(0),axis(1),axis(2));                    
                     break;
                     
                 case RQST_DISPLAY_REACHABILITY_AT_MARKER_HEIGHT:
@@ -712,7 +729,23 @@ int main(int argc, char **argv) {
                         break;        
                     }     
                     gripper_intfc.publish(gripper_close_can);
-
+                    ros::Duration(2).sleep(); // a pause for gripper to close
+                    arm_nav_msg.request.cmd_mode= ARM_DEPART_20CM;     
+                    g_arm_interface_svc_client.call(arm_nav_msg);   
+                    arm_server_busy_wait_done();
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }                    
+                    else {
+                        ROS_WARN("did not compute a valid path to grasp pose");
+                        break;        
+                    }     
                     break;
                     
                 case RQST_MOVE_MARKER_TO_MODEL_FRAME:
@@ -764,6 +797,84 @@ int main(int argc, char **argv) {
                     
                     //grasp_pose_wrt_model = get_grasp_transform; // mode 2 is model frame w/rt torso; rtn geometry_msgs::PoseStamped
                      
+                    break;
+                case RQST_GRAB_SHIRT_FROM_STOOL:
+                    ROS_INFO("RQST_GRAB_SHIRT_FROM_STOOL");
+                    // open the gripper:
+                    gripper_intfc.publish(gripper_open);
+
+                    // we'll hard-code a shirt-grasp pose and grasp approach pose
+                    grasp_pose_wrt_torso.header.frame_id = "yale_gripper_frame";
+                    grasp_pose_wrt_torso.header.stamp = ros::Time(0);
+                    pose.position.x = 0.56;
+                    pose.position.y = 0.0;
+                    pose.position.z = -0.12;
+                    pose.orientation.x = 0;
+                    pose.orientation.y = 1;
+                    pose.orientation.z = 0;
+                    pose.orientation.w = 0;
+                    grasp_pose_wrt_torso.pose = pose;
+                    approach_pose_wrt_torso.header.frame_id = "yale_gripper_frame";
+                    approach_pose_wrt_torso.header.stamp = ros::Time(0);
+                    pose.position.z += 0.1; // try 10cm
+                    approach_pose_wrt_torso.pose = pose;
+                    
+                    // visualize them with IM:
+                    //approach_pose_wrt_torso;
+                    ROS_INFO("move IM to proposed gasp frame: ");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = grasp_pose_wrt_torso;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);   
+                    ros::spinOnce();
+                    //ros::Duration(3).sleep();
+                    ROS_INFO("move IM to proposed approach frame: ");
+                    IM_6dof_srv_msg.request.cmd_mode = IM_SET_NEW_MARKER_POSE;
+                    IM_6dof_srv_msg.request.poseStamped_IM_desired = approach_pose_wrt_torso;
+                    status = IM_6dof_svc_client.call(IM_6dof_srv_msg);                     
+
+                    //try to move to the approach pose:
+                    arm_nav_msg.request.poseStamped_goal = approach_pose_wrt_torso;
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE;  
+                    g_arm_interface_svc_client.call(arm_nav_msg);           
+                    wait_done=arm_server_busy_wait_done(); 
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }
+                    else {
+                        ROS_WARN("did not compute a valid path");
+                        break;        
+                    }
+                    
+                    // attempt move to grasp pose:
+                    arm_nav_msg.request.poseStamped_goal = grasp_pose_wrt_torso;
+                    arm_nav_msg.request.cmd_mode= ARM_PLAN_PATH_CURRENT_TO_GOAL_POSE;  
+                    g_arm_interface_svc_client.call(arm_nav_msg);           
+                    wait_done=arm_server_busy_wait_done(); 
+                    //let's see if resulting plan was successful:
+                    arm_nav_msg.request.cmd_mode= ARM_QUERY_IS_PATH_VALID; 
+                    g_arm_interface_svc_client.call(arm_nav_msg);
+                    if (arm_nav_msg.response.rtn_code==ARM_PATH_IS_VALID) {
+                        ROS_INFO("computed a valid path");
+                        ROS_INFO("requesting execution of planned path");
+                        arm_nav_msg.request.cmd_mode= ARM_EXECUTE_PLANNED_PATH;     
+                        g_arm_interface_svc_client.call(arm_nav_msg);
+                        arm_server_busy_wait_done();
+                    }                    
+                    else {
+                        ROS_WARN("did not compute a valid path to grasp pose");
+                        break;        
+                    }     
+                    //close the gripper to the desired pinch pose
+                    gripper_intfc.publish(gripper_close_shirt);
+                    
+                    
                     break;
                     
                 default:
