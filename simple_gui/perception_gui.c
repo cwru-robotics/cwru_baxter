@@ -1,4 +1,4 @@
-// compile with:  gcc -o preception_gui perception_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
+// compile with:  gcc -o perception_gui perception_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
 // must do this from directory simple_gui, so it can find the glade file perception_gui.glade
 
 #include <gtk/gtk.h>
@@ -52,6 +52,13 @@ G_MODULE_EXPORT void enable_gripper_usb_cb(GtkButton *enable_gripper_usb, gpoint
     system("echo $PASSWORD | sudo -S chmod ugo+rwx /dev/ttyUSB0");
 
 }
+
+G_MODULE_EXPORT void sample_object_cb(GtkButton *take_snapshot, gpointer data) 
+{
+  printf("sampling object\n");
+    system("rosservice call pcl_perception_svc  17");
+}
+
 
 G_MODULE_EXPORT void save_obect_pointcloud_cb(GtkButton *save_object_pointcloud, gpointer data) 
 {

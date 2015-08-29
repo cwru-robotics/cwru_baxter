@@ -85,6 +85,7 @@ const int PCL_INQUIRE_STATUS = 13;
 const int PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME = 14;
 const int PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME = 15;
 const int PCL_TRAIN_NEW_OBJECT = 16;
+const int PCL_SAMPLE_OBJECT = 17;
 
 const int PCL_STATUS_BUSY = 1;
 const int PCL_STATUS_IDLE = 0;
@@ -1675,6 +1676,18 @@ int main(int argc, char** argv) {
                     find_plane(g_plane_params, g_indices_of_plane); // results in g_display_cloud (in orig frame), as well as 
                     //g_cloud_transformed (rotated version of original cloud); g_indices_of_plane indicate points on the plane
                     g_status = PCL_STATUS_IDLE;
+                    break;
+                case PCL_SAMPLE_OBJECT:
+                    for (int i = 0; i < silhouette_size; i++) {
+                        for (int j = 0; j < silhouette_size; j++) {
+                            g_silhouette_z[i][j] = 0;
+                            g_depth_z[i][j] = 0.0;
+                        }
+                    }     
+                    success = sample_object();
+                    if (success) { ROS_INFO("have new, averaged, sampled object in memory"); }
+                    else { ROS_INFO("sample_object() returned FALSE"); }
+                    g_status = PCL_STATUS_IDLE;                    
                     break;
                 case PCL_TRAIN_NEW_OBJECT:
                     for (int i = 0; i < silhouette_size; i++) {
