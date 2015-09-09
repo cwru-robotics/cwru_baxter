@@ -14,7 +14,7 @@
 
 
 #include <ros/ros.h>
-#include <example_ros_service/example_server_msg.h> // this message type is defined in the current package
+// #include <example_ros_service/example_server_msg.h>  //(removed) this message type is defined in the current package
 #include <iostream>
 #include <string>
 using namespace std;
