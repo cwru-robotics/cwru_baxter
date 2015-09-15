@@ -7,7 +7,7 @@ catkin_simple()
 
 # Executables
 cs_add_executable(move_gazebo_model src/move_gazebo_model.cpp)
-
+cs_add_executable(move_calibration_checkerboard src/move_calibration_checkerboard.cpp)
 cs_install()
 cs_export()
     

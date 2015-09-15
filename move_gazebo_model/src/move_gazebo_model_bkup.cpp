@@ -44,16 +44,11 @@ int main(int argc, char **argv) {
 
     geometry_msgs::Pose pose;
     geometry_msgs::Quaternion quat;
-    double x = -0.067;
-    double y = -0.06;
-    double z = 0.002;
-    double qx=0.0;
-    double qy=0.0;
-     pose.position.x = x;
-     pose.position.y = y;
-     pose.position.z = z;
-     quat.x = qx;
-     quat.y = qy;
+     pose.position.x = 0.5;
+     pose.position.y = 0.0;
+     pose.position.z = 0.775;
+     quat.x = 0.0;
+     quat.y = 0.0;
      quat.z = 0.0;
      quat.w = 1.0;
      pose.orientation= quat;
@@ -70,7 +65,6 @@ int main(int argc, char **argv) {
     qw = 1.0;
     int nsteps = 360;
     int ans;
-
     double dphi = (M_PI*2.0)/nsteps;
    for (int i=0;i<nsteps;i++) {
         //cout<<"you entered "<<in_name<<endl;
@@ -79,20 +73,8 @@ int main(int argc, char **argv) {
 	quat = convertPlanarPhi2Quaternion(theta_yaw);
         qz = quat.z;
         qw = quat.w;
-
-        // overwrite:
-        double norm = sqrt(qx*qx+qy*qy+qz*qz+qw*qw);
-        quat.x = qx/norm;
-        quat.y = qy/norm;
-        quat.z = qz/norm;
-        quat.w = qw/norm;
-	cout<<"qx, qy, qz, qw= "<<qx<<", "<<qy<<", "<<qz<<", "<<qw<<endl;
-	pose.orientation= quat;
-        //des_model_state.pose.orientation=quat;
-     	pose.position.x = x;
-     	pose.position.y = y;
-     	pose.position.z = z;
-    	des_model_state.pose = pose;
+	cout<<"qz, qw= "<<qz<<", "<<qw<<endl;
+        des_model_state.pose.orientation=quat;
         set_model_state_srv.request.model_state = des_model_state;
         if (client.call(set_model_state_srv)) {
             if (set_model_state_srv.response.success) {
@@ -107,22 +89,9 @@ int main(int argc, char **argv) {
             return 1;
         }
     ros::Duration(0.1).sleep();
-    //try x = -0.0067, y= -0.06, z = 0.1 and change rot's
-    //cout<<"enter x: ";
-    //cin >>x;
-    x = -0.067;
-    //cout<<"enter y: ";
-    //cin>>y;
-    y = -0.06;
-    //cout<<"enter z: ";
-    //cin>>z;
-    z = 0.1;
-    cout<<"enter qx: ";
-    cin>>qx;
-    cout<<"enter qy: ";
-    cin>>qy;
-    //cin>>ans;
-    //theta_yaw+= dphi;
+    cout<<"enter 1: ";
+    cin>>ans;
+        theta_yaw+= dphi;
     }
     return 0;
 }
