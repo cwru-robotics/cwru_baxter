@@ -1,5 +1,5 @@
-// compile with:  gcc -o service_call_gui service_call_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
-// must do this from directory simple_gui, so it can find the glade file glade2_example.glade
+// compile with:  gcc -o perception_gui perception_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
+// must do this from directory simple_gui, so it can find the glade file perception_gui.glade
 
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -53,11 +53,26 @@ G_MODULE_EXPORT void enable_gripper_usb_cb(GtkButton *enable_gripper_usb, gpoint
 
 }
 
+G_MODULE_EXPORT void sample_object_cb(GtkButton *take_snapshot, gpointer data) 
+{
+  printf("sampling object\n");
+    system("rosservice call pcl_perception_svc  17");
+}
+
+
+G_MODULE_EXPORT void save_obect_pointcloud_cb(GtkButton *save_object_pointcloud, gpointer data) 
+{
+  printf("save object pointcloud...\n");
+  printf("NOT IMPLEMENTED");
+    //system("rosservice call pcl_perception_svc  6");
+}
+
 G_MODULE_EXPORT void take_snapshot_cb(GtkButton *take_snapshot, gpointer data) 
 {
   printf("refreshing snapshot of pointcloud\n");
     system("rosservice call pcl_perception_svc  6");
 }
+
 
 G_MODULE_EXPORT void find_plane_cb(GtkButton *find_plane, gpointer data) 
 {
@@ -184,7 +199,7 @@ main (int argc, char *argv[])
         return( 1 );
     }
 */
-        gtk_builder_add_from_file (builder, "glade2_example.glade", NULL);
+        gtk_builder_add_from_file (builder, "perception_gui.glade", NULL);
         /* window = GTK_WIDGET (gtk_builder_get_object (builder, "window")); */
         window = GTK_WIDGET (gtk_builder_get_object (builder, "window1"));
         gtk_builder_connect_signals (builder, NULL);          

@@ -16,6 +16,8 @@ In third terminal,
 `roscd simple_gui`
 `./service_call_gui`
 
+FOR PHYSICAL BAXTER ONLY:
+
 To use Yale hand, (in 4th terminal):
 `roslaunch motor_controller yale_hand.launch`
 

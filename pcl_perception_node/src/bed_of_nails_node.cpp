@@ -84,7 +84,8 @@ const int PCL_FIND_TABLE = 12;
 const int PCL_INQUIRE_STATUS = 13;
 const int PCL_FIND_GAZEBO_BEER_GRASP_FROM_ABOVE_FRAME = 14;
 const int PCL_FIND_COKE_CAN_GRASP_FROM_ABOVE_FRAME = 15;
-
+const int PCL_TRAIN_NEW_OBJECT = 16;
+const int PCL_SAMPLE_OBJECT = 17;
 
 const int PCL_STATUS_BUSY = 1;
 const int PCL_STATUS_IDLE = 0;
@@ -95,7 +96,7 @@ const int PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO = 2;
 const int PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_MODEL = 3;
 const int PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_TORSO = 4;
 
-const double Z_EPS = 0.01; //choose a tolerance for plane fitting, e.g. 1cm
+const double Z_EPS = 0.02; //choose a tolerance for plane fitting, e.g. 1cm
 const double R_EPS = 0.05; // choose a tolerance for cylinder-fit outliers
 
 //const double R_CYLINDER = 0.055; //estimated from ruler tool...example to fit a cylinder of this radius to data
@@ -106,11 +107,13 @@ const double R_CYLINDER = 0.03; //estimated from ruler tool...example to fit a c
 const double H_CYLINDER = 0.12; // estimated height of cylinder
 /**/
 // set training window x and y range; nom x = 0.7, y = 0
-const double x_view_min = 0.35; //0.3 picks up some of e-stop box
-const double x_view_max = 0.9;
-const double y_view_min = -0.2;
-const double y_view_max = 0.2;
+const double g_x_view_min = 0.35; //0.3 picks up some of e-stop box
+const double g_x_view_max = 0.9;
+const double g_y_view_min = -0.2;
+const double g_y_view_max = 0.2;
 const int silhouette_size = 128; //set chosen resolution for sampling "bed of nails"
+//const int g_ictr = floor(silhouette_size/2);
+//const int g_jctr = floor(silhouette_size/2);
 
 const double default_table_z_height_wrt_baxter_base_frame = -0.213; // experimentally, this is height of stool relative to baxter frame;
 // OK for default, but more generally, replace this with data from perception in calls to find objects
@@ -134,7 +137,8 @@ void filter_cloud_above_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, double z_th
 
 void compute_depth_map_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &indices,
         float x_min, float x_max, float y_min, float y_max,
-        int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size]);
+        int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size],
+        int &ix_centroid, int &jy_centroid);
 void find_bounding_box(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &indices,
         float &x_min, float &x_max, float &y_min, float &y_max, float &z_min, float &z_max);
 
@@ -154,6 +158,14 @@ void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, 
 void process_patch(std::vector<int> &iselect_filtered, Eigen::Vector3f &centroidEvec3f, Eigen::Vector4f &plane_params);
 void compute_radial_error(PointCloud<pcl::PointXYZ>::Ptr inputCloud, std::vector<int> indices, double r, Eigen::Vector3f center, double &E, double &dEdCx, double &dEdCy);
 void make_can_cloud(PointCloud<pcl::PointXYZ>::Ptr canCloud, double r_can, double h_can);
+int compute_silhouette_centroid(int silhouette_z[silhouette_size][silhouette_size], int &ix_centroid, int &jy_centroid);
+bool recenter_silhouette(int silhouette_z[silhouette_size][silhouette_size], int ix_centroid, int jy_centroid);
+bool recenter_silhouette_and_depth_map_z(int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size],
+        int ix_centroid, int jy_centroid);
+void display_silhouette_z(int silhouette_z[silhouette_size][silhouette_size]);
+bool sample_object(); // take N snapshots and compute average (centered) top-view projection, silhouette(i,j) and z(i,j)
+
+ros::Publisher g_pubCloud;  // make this publisher global
 
 //next line causes a seg-fault!! even if you don't use ne
 // SEEMS TO BE DUE TO C++11 FLAGS--DO NOT COMPILE W/ C++11 !!
@@ -167,6 +179,16 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr g_cloud_transformed(new pcl::PointCloud<pcl:
 pcl::PointCloud<pcl::PointXYZ>::Ptr g_cloud_wrt_base(new pcl::PointCloud<pcl::PointXYZ>); // holder for processed point clouds
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr g_display_cloud(new pcl::PointCloud<pcl::PointXYZ>); // this cloud gets published--viewable in rviz
+
+//use this cloud to hold points of an object model, expressed relative to table-top height;
+//ideally, these would be in a table frame...but for now, assume table normal is parallel to torso-frame z-component
+pcl::PointCloud<pcl::PointXYZ>::Ptr g_object_cloud(new pcl::PointCloud<pcl::PointXYZ>); // this cloud gets published--viewable in rviz
+int g_silhouette_z[silhouette_size][silhouette_size];
+float g_depth_z[silhouette_size][silhouette_size];
+int g_num_snapshots_avg = 10;
+std::string g_object_name;
+int g_ans;
+
 //PointCloud<pcl::PointXYZ>::Ptr canCloud
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr g_pclSelect(new pcl::PointCloud<pcl::PointXYZ>); // holds published points, per Rviz tool
@@ -197,12 +219,12 @@ Eigen::Affine3f g_A_plane, g_A_model_wrt_torso, g_A_model_wrt_base;
 Eigen::Affine3f g_A_grasp_wrt_model, g_A_grasp_wrt_base;
 Eigen::Affine3d g_A3d_model;
 Eigen::Affine3f g_affine_kinect_to_base;
-Eigen::Affine3f g_affine_kinect_to_head,g_affine_head_to_base;
+Eigen::Affine3f g_affine_kinect_to_head, g_affine_head_to_base;
 double g_z_plane_nom;
-double g_table_z_wrt_base;
+double g_table_z_wrt_base = -0.217; // default value for stool
 std::vector<int> g_indices_of_plane; //indices of patch that do not contain outliers 
 tf::StampedTransform g_kinect_sensor_to_base_link;
-tf::StampedTransform g_head_to_base_link,g_kinect_sensor_to_head_link;
+tf::StampedTransform g_head_to_base_link, g_kinect_sensor_to_head_link;
 //void pcl_ros::transformPointCloud 	( 	const pcl::PointCloud< PointT > &  	cloud_in,
 //		pcl::PointCloud< PointT > &  	cloud_out,
 //		const tf::Transform &  	transform 
@@ -246,7 +268,7 @@ void transformTFToEigen(const tf::Transform &t, Eigen::Affine3f &e) {
     e.matrix()(3, 3) = 1;
 }
 
- geometry_msgs::Pose transformEigenAffine3fToPose(Eigen::Affine3f e) {
+geometry_msgs::Pose transformEigenAffine3fToPose(Eigen::Affine3f e) {
     Eigen::Vector3f Oe;
     Eigen::Matrix3f Re;
     geometry_msgs::Pose pose;
@@ -262,7 +284,7 @@ void transformTFToEigen(const tf::Transform &t, Eigen::Affine3f &e) {
     pose.orientation.y = q.y();
     pose.orientation.z = q.z();
     pose.orientation.w = q.w();
-    
+
     return pose;
 }
 
@@ -904,7 +926,8 @@ void sort_pts_by_horiz_planes(PointCloud<pcl::PointXYZ>::Ptr inputCloudWrtBase, 
 
 void compute_depth_map_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> &indices,
         float x_min, float x_max, float y_min, float y_max,
-        int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size]) {
+        int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size],
+        int &ix_centroid, int &jy_centroid) {
     float del_x, del_y;
     int bitmap[silhouette_size][silhouette_size];
 
@@ -917,43 +940,280 @@ void compute_depth_map_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, vector<int> 
     int npts = indices.size();
     Eigen::Vector3f pt;
     int ix, jy;
-    del_x = (x_view_max - x_view_min) / silhouette_size;
-    del_y = (y_view_max - y_view_min) / silhouette_size;
+    del_x = (g_x_view_max - g_x_view_min) / silhouette_size;
+    del_y = (g_y_view_max - g_y_view_min) / silhouette_size;
     int ix_min, ix_max, jy_min, jy_max; // convert dimensions of bounding box to indices
-    ix_min = int_bin(x_view_min, del_x, x_min);
-    ix_max = int_bin(x_view_min, del_x, x_max);
-    jy_min = int_bin(y_view_min, del_y, y_min);
-    jy_max = int_bin(y_view_min, del_y, y_max);
+    ix_min = int_bin(g_x_view_min, del_x, x_min);
+    ix_max = int_bin(g_x_view_min, del_x, x_max);
+    jy_min = int_bin(g_y_view_min, del_y, y_min);
+    jy_max = int_bin(g_y_view_min, del_y, y_max);
 
 
     for (int i = 0; i < npts; i++) {
         pt = inputCloud->points[indices[i]].getVector3fMap();
-        ix = int_bin(x_view_min, del_x, pt[0]);
-        jy = int_bin(y_view_min, del_y, pt[1]);
+        ix = int_bin(g_x_view_min, del_x, pt[0]);
+        jy = int_bin(g_y_view_min, del_y, pt[1]);
         silhouette_z[ix][jy]++;
-        depth_z[ix][jy] += pt[2];
+        depth_z[ix][jy] += pt[2] - g_table_z_wrt_base; // this is z w/rt table height
         bitmap[ix][jy] = 1;
     }
-    //compute the centroid in ix,jy coords
-    int ix_centroid = 0;
-    int jy_centroid = 0;
-    int n_bits_on = 0;
+    //compute avg z-height and centroid in ix,jy coords
+    ix_centroid = 0;
+    jy_centroid = 0;
+    int n_bins_on = 0; //how many of the pixels in the top-down silhouette are occupied?
     for (int ix = 0; ix < silhouette_size; ix++)
         for (int jy = 0; jy < silhouette_size; jy++) {
             if (silhouette_z[ix][jy]) {
                 ix_centroid += ix;
                 jy_centroid += jy;
-                n_bits_on++;
+                n_bins_on++;
                 depth_z[ix][jy] /= silhouette_z[ix][jy]; // compute avg depth for each nonzero cell
             }
         }
     // these values should be useful--should return them
-    ix_centroid /= n_bits_on;
-    jy_centroid /= n_bits_on;
+    ix_centroid /= n_bins_on;
+    jy_centroid /= n_bins_on;
     ROS_INFO("centroid ix,jy = %d, %d", ix_centroid, jy_centroid);
-    ROS_INFO("bits on = %d", n_bits_on);
+    ROS_INFO("bits on = %d", n_bins_on);
     ROS_INFO("indices of bounding box: xmin, xmax, ymin, ymax = %d, %d, %d, %d",
             ix_min, ix_max, jy_min, jy_max);
+}
+
+//given silhouette = array of ints, with object centroid at ix_centroid,jy_centroid,
+// shift the contents of silhouette_z such that ix_centroid is at g_ictr and iy_centroid is g_jctr
+
+bool recenter_silhouette(int silhouette_z[silhouette_size][silhouette_size], int ix_centroid, int jy_centroid) {
+    const int ictr = floor(silhouette_size / 2);
+    const int jctr = floor(silhouette_size / 2);
+    int silhouette_z_copy[silhouette_size][silhouette_size];
+    for (int i = 0; i < silhouette_size; i++)
+        for (int j = 0; j < silhouette_size; j++) {
+            silhouette_z_copy[i][j] = silhouette_z[i][j];
+            silhouette_z[i][j] = 0;
+        }
+    int i_shifted; // = ictr-ix_centroid;
+    int j_shifted; // = jctr-jy_centroid);
+    for (int i = 0; i < silhouette_size; i++) {
+        i_shifted = i + ictr - ix_centroid;
+        if ((i_shifted >= 0)&&(i_shifted < silhouette_size)) { // here if i_shifted is in range
+
+            for (int j = 0; j < silhouette_size; j++) {
+                j_shifted = j + jctr - jy_centroid;
+                if ((j_shifted >= 0)&&(j_shifted < silhouette_size)) {
+                    silhouette_z[i_shifted][j_shifted] = silhouette_z_copy[i][j];
+                }
+            }
+        }
+    }
+
+}
+
+//given silhouette = array of ints, with object centroid at ix_centroid,jy_centroid,
+// shift the contents of silhouette_z such that ix_centroid is at g_ictr and iy_centroid is g_jctr
+
+bool recenter_silhouette_and_depth_map_z(int silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size],
+        int ix_centroid, int jy_centroid) {
+    const int ictr = floor(silhouette_size / 2);
+    const int jctr = floor(silhouette_size / 2);
+    int silhouette_z_copy[silhouette_size][silhouette_size];
+    float depth_z_copy[silhouette_size][silhouette_size];
+    for (int i = 0; i < silhouette_size; i++)
+        for (int j = 0; j < silhouette_size; j++) {
+            silhouette_z_copy[i][j] = silhouette_z[i][j];
+            silhouette_z[i][j] = 0;
+            depth_z_copy[i][j] = depth_z[i][j];
+            depth_z[i][j] = 0.0;
+        }
+    int i_shifted; // = ictr-ix_centroid;
+    int j_shifted; // = jctr-jy_centroid);
+    for (int i = 0; i < silhouette_size; i++) {
+        i_shifted = i + ictr - ix_centroid;
+        if ((i_shifted >= 0)&&(i_shifted < silhouette_size)) { // here if i_shifted is in range
+
+            for (int j = 0; j < silhouette_size; j++) {
+                j_shifted = j + jctr - jy_centroid;
+                if ((j_shifted >= 0)&&(j_shifted < silhouette_size)) {
+                    silhouette_z[i_shifted][j_shifted] = silhouette_z_copy[i][j];
+                    depth_z[i_shifted][j_shifted] = depth_z_copy[i][j];
+                }
+            }
+        }
+    }
+
+}
+
+int compute_silhouette_centroid(int silhouette_z[silhouette_size][silhouette_size], int &ix_centroid, int &jy_centroid) {
+    ix_centroid = 0;
+    jy_centroid = 0;
+    int n_bins_on = 0; //how many of the pixels in the top-down silhouette are occupied?
+    for (int ix = 0; ix < silhouette_size; ix++)
+        for (int jy = 0; jy < silhouette_size; jy++) {
+            if (silhouette_z[ix][jy]) {
+                ix_centroid += ix;
+                jy_centroid += jy;
+                n_bins_on++;
+            }
+        }
+    if (n_bins_on == 0) {
+        return n_bins_on;
+    }
+
+    ix_centroid /= n_bins_on;
+    jy_centroid /= n_bins_on;
+    ROS_INFO("centroid ix,jy = %d, %d", ix_centroid, jy_centroid);
+    ROS_INFO("number of populated cells in = %d", n_bins_on);
+}
+
+//given silhouette and dept_z matrices, find centroid; repopulate arrays w/ centroid in center of range
+/*
+int recenter_depth_z(silhouette_z[silhouette_size][silhouette_size], float depth_z[silhouette_size][silhouette_size], int &ix_centroid,int &jy_centroid) {
+    //compute the centroid in ix,jy coords
+    ix_centroid = 0;
+    jy_centroid = 0;
+    int n_bins_on = 0; //how many of the pixels in the top-down silhouette are occupied?
+    for (int ix = 0; ix < silhouette_size; ix++)
+        for (int jy = 0; jy < silhouette_size; jy++) {
+            if (silhouette_z[ix][jy]) {
+                ix_centroid += ix;
+                jy_centroid += jy;
+                n_bins_on++;
+                depth_z[ix][jy] /= silhouette_z[ix][jy]; // compute avg depth for each nonzero cell
+            }
+            else {
+                depth_z[ix][jy] = 0.0;
+            }
+        }
+    if (n_bins_on==0) {
+        return n_bins_on;
+    }
+    // these values should be useful--should return them
+    ix_centroid /= n_bins_on;
+    jy_centroid /= n_bins_on;
+    ROS_INFO("centroid ix,jy = %d, %d", ix_centroid, jy_centroid);
+    ROS_INFO("number of populated cells in top-down projection = %d", n_bins_on);
+    
+}
+ */
+//operates on g_cloud_wrt_base using g_table_z_wrt_base
+//pcl::PointCloud<pcl::PointXYZ>::Ptr g_object_cloud(new pcl::PointCloud<pcl::PointXYZ>); // this cloud gets published--viewable in rviz
+//int g_silhouette_z[silhouette_size][silhouette_size];
+//float g_depth_z[silhouette_size][silhouette_size];
+
+bool sample_object() {
+    int silhouette_z[silhouette_size][silhouette_size];
+    float depth_z[silhouette_size][silhouette_size];
+    int ix_centroid, jy_centroid;
+    Eigen::Vector3f pt;
+    std::vector<int> indices_pts_above_plane;
+    float x_min, x_max, y_min, y_max, z_min, z_max;
+
+    ROS_INFO("performing new model sampling");
+    ROS_INFO("filtering for points above identified plane");
+    // w/ affine transform, z-coord of points on plane (in plane frame) should be ~0
+    double z_threshold = 0.0 + Z_EPS + g_table_z_wrt_base; //g_plane_params[3] + Z_EPS;
+
+    for (int num_snapshots = 0; num_snapshots < g_num_snapshots_avg; num_snapshots++) {
+        g_take_snapshot = true;
+        while (g_take_snapshot) {
+                        ros::spinOnce();
+        }
+        ROS_INFO("got snapshot.");
+        ROS_INFO("filtering for points above %f ", z_threshold);
+
+        //this version of filter_cloud_above_z considers only points within specified x,y bounds
+        filter_cloud_above_z(g_cloud_wrt_base, z_threshold, g_x_view_min, g_x_view_max, g_y_view_min, g_y_view_max, indices_pts_above_plane);
+        if (indices_pts_above_plane.size() == 0) {
+            ROS_WARN("no points found within filter volume!");
+            return false;
+        }
+        //extract these points--but in original, non-rotated frame, and display them
+        copy_cloud(g_pclKinect, indices_pts_above_plane, g_display_cloud);
+        pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
+        g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
+        g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+        ros::spinOnce();
+        ROS_INFO("finding bounding box");
+        //cout<<"finding bounding box; enter 1: ";
+        //int ans;
+        //cin>>ans;
+        int silhouette_z[silhouette_size][silhouette_size];
+        float depth_z[silhouette_size][silhouette_size];
+        //transform_cloud(g_pclKinect, g_affine_kinect_to_base,  g_cloud_wrt_base);
+        //find_bounding_box(g_cloud_transformed, indices_pts_above_plane,x_min,x_max,y_min,y_max,z_min,z_max);
+        find_bounding_box(g_cloud_wrt_base, indices_pts_above_plane, x_min, x_max, y_min, y_max, z_min, z_max);
+
+        compute_depth_map_z(g_cloud_wrt_base, indices_pts_above_plane, x_min, x_max, y_min, y_max,
+                silhouette_z, depth_z, ix_centroid, jy_centroid);
+        //display_silhouette_z(silhouette_z);
+        ROS_INFO("bounds: x_min, x_max, y_min, y_max = %f, %f %f, %f", x_min, x_max, y_min, y_max);
+        ROS_INFO("centroid indices: %d, %d", ix_centroid, jy_centroid);
+        //cout << "enter 1: ";
+
+        //cin>>ans;
+        //success= recenter_silhouette(silhouette_z,ix_centroid,jy_centroid);
+        bool success = recenter_silhouette_and_depth_map_z(silhouette_z, depth_z, ix_centroid, jy_centroid);
+
+        //debug: 
+        ROS_INFO("recentered silhouette: ");
+        display_silhouette_z(silhouette_z);
+        compute_silhouette_centroid(silhouette_z, ix_centroid, jy_centroid);
+        // now have silhouette_z and depth_z from a snapshot; want to average these for multiple snapshots
+        // to reduce noise, let's eliminate ALL points for which any one snapshot has zero signal...conservative min model?? 
+        // may want to change this
+        //        
+        //for first snapshot, initialize cumulative arrays:
+        if (num_snapshots == 0) {
+            for (int i = 0; i < silhouette_size; i++)
+                for (int j = 0; j < silhouette_size; j++) {
+                    g_silhouette_z[i][j] = silhouette_z[i][j];
+                    g_depth_z[i][j] = depth_z[i][j];
+                }
+        } else {
+            // let's test each value and if present, average in depth_z;
+            for (int i = 0; i < silhouette_size; i++) {
+                for (int j = 0; j < silhouette_size; j++) {
+                    if (g_silhouette_z[i][j] && silhouette_z[i][j]) {
+                        g_depth_z[i][j] += depth_z[i][j];
+                        g_silhouette_z[i][j] += silhouette_z[i][j];
+                    } else {
+                        g_silhouette_z[i][j] = 0; // suppress this cell
+                    }
+
+                }
+            }
+        }
+        ros::spinOnce();
+        //DEBUG
+        ROS_INFO("snapshot number %d",num_snapshots);
+        //cout<<"enter 1: ";
+        //1cin>>g_ans;
+    }
+
+    ROS_INFO("computing avg properties");
+       for (int i = 0; i < silhouette_size; i++) {
+           for (int j = 0; j < silhouette_size; j++) {
+                        g_depth_z[i][j] /= g_num_snapshots_avg;
+                        g_silhouette_z[i][j] /= g_num_snapshots_avg;
+                    } 
+
+                }
+    //recenter the averaged result:
+    recenter_silhouette_and_depth_map_z(g_silhouette_z, g_depth_z, ix_centroid, jy_centroid);
+    
+    display_silhouette_z(g_silhouette_z);
+    ROS_INFO("done w/ sampling/averaging object");
+    /* DEBUG: display z-heights for non-empty cells 
+             for (int i = 0; i < silhouette_size; i++) {
+                for (int j = 0; j < silhouette_size; j++) {
+                    if (g_silhouette_z[i][j]) {   
+                        cout<<g_depth_z[i][j]<<",";
+                    }
+                }
+             cout<<endl;
+             }
+    */
+
+    return true;
 }
 
 void display_silhouette_z(int silhouette_z[silhouette_size][silhouette_size]) {
@@ -1091,31 +1351,31 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
     switch (request.cmd_mode) {
         case PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_MODEL:
             ROS_INFO("requesting grasp pose w/rt model");
-            pose= transformEigenAffine3fToPose(g_A_grasp_wrt_model);
+            pose = transformEigenAffine3fToPose(g_A_grasp_wrt_model);
             ROS_INFO("grasp pose origin: %f, %f, %f", pose.position.x, pose.position.y, pose.position.z);
             ROS_INFO("grasp pose quat: %f, %f, %f, %f", pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
 
             poseStamped.pose = pose;
             poseStamped.header.stamp = ros::Time().now();
             poseStamped.header.frame_id = "model"; // this frame is unknown to rviz...no transform to base (yet)
-            response.poseStamped_IM_current = poseStamped;            
+            response.poseStamped_IM_current = poseStamped;
             break;
-            
+
         case PCL_FRAME_SVC_GET_GRASP_FRAME_WRT_TORSO:
             ROS_INFO("requesting grasp pose w/rt torso");
-            pose= transformEigenAffine3fToPose(g_A_grasp_wrt_base);
+            pose = transformEigenAffine3fToPose(g_A_grasp_wrt_base);
             ROS_INFO("grasp pose origin: %f, %f, %f", pose.position.x, pose.position.y, pose.position.z);
             ROS_INFO("grasp pose quat: %f, %f, %f, %f", pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
 
             poseStamped.pose = pose;
             poseStamped.header.stamp = ros::Time().now();
             poseStamped.header.frame_id = "torso"; // this frame is unknown to rviz...no transform to base (yet)
-            response.poseStamped_IM_current = poseStamped;             
+            response.poseStamped_IM_current = poseStamped;
             break;
 
         case PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_TORSO:
             ROS_INFO("requesting model pose w/rt torso");
-            pose= transformEigenAffine3fToPose(g_A_model_wrt_base);
+            pose = transformEigenAffine3fToPose(g_A_model_wrt_base);
             ROS_INFO("model pose origin: %f, %f, %f", pose.position.x, pose.position.y, pose.position.z);
             ROS_INFO("model pose quat: %f, %f, %f, %f", pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
 
@@ -1124,11 +1384,11 @@ bool getFrameService(cwru_srv::IM_node_service_messageRequest& request, cwru_srv
             poseStamped.header.frame_id = "torso"; // this mode assumes affine is w/rt torso
             response.poseStamped_IM_current = poseStamped;
             break;
-            
+
         case PCL_FRAME_SVC_GET_MODEL_FRAME_WRT_KINECT:
             ROS_INFO("requesting model pose w/rt kinect");
-            pose= transformEigenAffine3fToPose(g_A_model_wrt_torso);
-              
+            pose = transformEigenAffine3fToPose(g_A_model_wrt_torso);
+
             //cout << "model frame origin: " << g_A_model.translation().transpose() << endl;
             //cout << "model frame orientation: " << endl;
             //cout << g_A_model.linear() << endl;
@@ -1239,11 +1499,11 @@ int main(int argc, char** argv) {
     g_tf_kinect_sensor_to_head_link.setOrigin(g_kinect_sensor_to_head_link.getOrigin());
     g_tf_kinect_sensor_to_head_link.setRotation(g_kinect_sensor_to_head_link.getRotation());
     transformTFToEigen(g_tf_kinect_sensor_to_head_link, g_affine_kinect_to_head);
-    
+
     g_tf_head_to_base_link.setOrigin(g_head_to_base_link.getOrigin());
     g_tf_head_to_base_link.setRotation(g_head_to_base_link.getRotation());
     transformTFToEigen(g_tf_head_to_base_link, g_affine_head_to_base);
-    
+
     // had to cascade these in the following order...then use inverse of affine_kinect_to_base to transform pt into base frame
     g_affine_kinect_to_base = g_affine_kinect_to_head*g_affine_head_to_base; //g_affine_head_to_base*g_affine_kinect_to_head;
     //g_tf_kinect_sensor_to_base_link.setOrigin(g_kinect_sensor_to_base_link.getOrigin());
@@ -1262,7 +1522,7 @@ int main(int argc, char** argv) {
     ros::Subscriber selectedPoints = nh.subscribe<sensor_msgs::PointCloud2> ("/selected_points", 1, selectCB);
 
     // have rviz display both of these topics
-    ros::Publisher pubCloud = nh.advertise<sensor_msgs::PointCloud2> ("/pcl_perception_display", 1);
+    g_pubCloud = nh.advertise<sensor_msgs::PointCloud2> ("/pcl_perception_display", 1);
     ros::Publisher pubModel = nh.advertise<sensor_msgs::PointCloud2> ("/model_display", 1);
     ros::Publisher pubPcdCloud = nh.advertise<sensor_msgs::PointCloud2> ("/kinect_pointcloud", 1);
 
@@ -1330,6 +1590,9 @@ int main(int argc, char** argv) {
     int islab_can_top = 31; //want to find this...be more intelligent about it
     vector<float> z_mins;
     vector<float> z_maxs;
+    bool success;
+    //int ans;
+    int ix_centroid, jy_centroid;
     while (ros::ok()) {
         if (g_trigger) {
             g_trigger = false; // reset the trigger
@@ -1355,7 +1618,7 @@ int main(int argc, char** argv) {
                             copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
                             pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                             g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                             ros::spinOnce();
                             ROS_INFO("enter 1: ");
                             cin>>window_bkpt;
@@ -1366,7 +1629,7 @@ int main(int argc, char** argv) {
                             copy_cloud(g_pclKinect, indices_windowed, g_display_cloud);
                             pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                             g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                             ros::spinOnce();
                             ROS_INFO("enter 1: ");
                             cin>>window_bkpt;
@@ -1391,7 +1654,7 @@ int main(int argc, char** argv) {
                             copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
                             pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                             g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                            pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                            g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                             ros::spinOnce();
                             ROS_INFO("enter 1: ");
                             cin>>window_bkpt;
@@ -1414,6 +1677,37 @@ int main(int argc, char** argv) {
                     //g_cloud_transformed (rotated version of original cloud); g_indices_of_plane indicate points on the plane
                     g_status = PCL_STATUS_IDLE;
                     break;
+                case PCL_SAMPLE_OBJECT:
+                    for (int i = 0; i < silhouette_size; i++) {
+                        for (int j = 0; j < silhouette_size; j++) {
+                            g_silhouette_z[i][j] = 0;
+                            g_depth_z[i][j] = 0.0;
+                        }
+                    }     
+                    success = sample_object();
+                    if (success) { ROS_INFO("have new, averaged, sampled object in memory"); }
+                    else { ROS_INFO("sample_object() returned FALSE"); }
+                    g_status = PCL_STATUS_IDLE;                    
+                    break;
+                case PCL_TRAIN_NEW_OBJECT:
+                    for (int i = 0; i < silhouette_size; i++) {
+                        for (int j = 0; j < silhouette_size; j++) {
+                            g_silhouette_z[i][j] = 0;
+                            g_depth_z[i][j] = 0.0;
+                        }
+                    }
+                    ROS_INFO("enter object name:  ");
+                    cin>>g_object_name;
+                    ROS_INFO("new object name is %s", g_object_name.c_str()); //.c_str());
+                    ROS_INFO("taking snapshot...");
+                    g_take_snapshot = true;
+                    while (g_take_snapshot) {
+                        ros::spinOnce();
+                    }
+                    ROS_INFO("got snapshot.");
+                    success = sample_object();
+                    g_status = PCL_STATUS_IDLE;
+                    break;
                 case PCL_FIND_PNTS_ABOVE_PLANE:
                     ROS_INFO("filtering for points above identified plane");
                     // w/ affine transform, z-coord of points on plane (in plane frame) should be ~0
@@ -1421,7 +1715,11 @@ int main(int argc, char** argv) {
                     ROS_INFO("filtering for points above %f ", z_threshold);
 
                     //filter_cloud_above_z(g_cloud_transformed, z_threshold, indices_pts_above_plane);
-                    filter_cloud_above_z(g_cloud_wrt_base, z_threshold, x_view_min, x_view_max, y_view_min, y_view_max, indices_pts_above_plane);
+                    filter_cloud_above_z(g_cloud_wrt_base, z_threshold, g_x_view_min, g_x_view_max, g_y_view_min, g_y_view_max, indices_pts_above_plane);
+                    if (indices_pts_above_plane.size() == 0) {
+                        ROS_WARN("no points found within filter volume!");
+                        break;
+                    }
                     //extract these points--but in original, non-rotated frame; useful for display
                     copy_cloud(g_pclKinect, indices_pts_above_plane, g_display_cloud);
                     //test:
@@ -1436,9 +1734,20 @@ int main(int argc, char** argv) {
                     find_bounding_box(g_cloud_wrt_base, indices_pts_above_plane, x_min, x_max, y_min, y_max, z_min, z_max);
 
                     compute_depth_map_z(g_cloud_wrt_base, indices_pts_above_plane, x_min, x_max, y_min, y_max,
-                            silhouette_z, depth_z);
+                            silhouette_z, depth_z, ix_centroid, jy_centroid);
                     display_silhouette_z(silhouette_z);
                     ROS_INFO("bounds: x_min, x_max, y_min, y_max = %f, %f %f, %f", x_min, x_max, y_min, y_max);
+                    ROS_INFO("centroid indices: %d, %d", ix_centroid, jy_centroid);
+                    cout << "enter 1: ";
+
+                    cin>>ans;
+                    //success= recenter_silhouette(silhouette_z,ix_centroid,jy_centroid);
+                    success = recenter_silhouette_and_depth_map_z(silhouette_z, depth_z, ix_centroid, jy_centroid);
+
+                    ROS_INFO("recentered silhouette: ");
+                    display_silhouette_z(silhouette_z);
+                    compute_silhouette_centroid(silhouette_z, ix_centroid, jy_centroid);
+
                     //
                     g_status = PCL_STATUS_IDLE;
                     break;
@@ -1519,7 +1828,7 @@ int main(int argc, char** argv) {
                     copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
                     pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                     g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                     ros::spinOnce();
                     g_status = PCL_STATUS_IDLE;
                     break;
@@ -1534,22 +1843,22 @@ int main(int argc, char** argv) {
                     copy_cloud(g_pclKinect, indices_slab_i, g_display_cloud);
                     pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                     g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                     ros::spinOnce();
                     g_status = PCL_STATUS_IDLE;
                     break;
 
                 case PCL_FIND_COKE_FRAME:
                     ROS_INFO("case PCL_FIND_COKE_FRAME");
-                    z_table = object_finder.get_table_height();     
-                    
+                    z_table = object_finder.get_table_height();
+
                     //affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, default_table_z_height_wrt_baxter_base_frame);
-                    affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, indices_object_top,z_table);
+                    affine_model_frame_wrt_baxter_base = object_finder.find_coke_can_frame(g_cloud_wrt_base, indices_object_top, z_table);
 
                     copy_cloud(g_pclKinect, indices_object_top, g_display_cloud);
                     pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                     g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                     ros::spinOnce();
                     // debug output:
                     model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
@@ -1560,7 +1869,7 @@ int main(int argc, char** argv) {
                     cout << "g_A_model_wrt_base origin: " << g_A_model_wrt_base.translation().transpose() << endl;
                     g_status = PCL_STATUS_IDLE;
                     break;
-                    
+
                 case PCL_FIND_GAZEBO_BEER_FRAME:
                     ROS_INFO("case PCL_FIND_GAZEBO_BEER_FRAME");
                     z_table = object_finder.get_table_height();
@@ -1571,7 +1880,7 @@ int main(int argc, char** argv) {
                     copy_cloud(g_pclKinect, indices_object_top, g_display_cloud);
                     pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
                     g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-                    pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+                    g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
                     ros::spinOnce();
                     // debug output:
                     model_frame_origin = affine_model_frame_wrt_baxter_base.translation();
@@ -1588,7 +1897,7 @@ int main(int argc, char** argv) {
                     g_A_grasp_wrt_model = object_finder.get_grasp_transform_gazebo_beer_grasp_from_above();
                     grasp_origin_wrt_model = g_A_grasp_wrt_model.translation();
 
-                    ROS_INFO("grasp offset w/rt model: %f, %f, %f",grasp_origin_wrt_model[0],grasp_origin_wrt_model[1],grasp_origin_wrt_model[2]);
+                    ROS_INFO("grasp offset w/rt model: %f, %f, %f", grasp_origin_wrt_model[0], grasp_origin_wrt_model[1], grasp_origin_wrt_model[2]);
                     g_A_grasp_wrt_base = g_A_model_wrt_base*g_A_grasp_wrt_model;
                     g_status = PCL_STATUS_IDLE;
                     break;
@@ -1597,9 +1906,9 @@ int main(int argc, char** argv) {
                     g_A_grasp_wrt_model = object_finder.get_grasp_transform_coke_can_grasp_from_above();
                     grasp_origin_wrt_model = g_A_grasp_wrt_model.translation();
 
-                    ROS_INFO("grasp offset w/rt model: %f, %f, %f",grasp_origin_wrt_model[0],grasp_origin_wrt_model[1],grasp_origin_wrt_model[2]);
+                    ROS_INFO("grasp offset w/rt model: %f, %f, %f", grasp_origin_wrt_model[0], grasp_origin_wrt_model[1], grasp_origin_wrt_model[2]);
                     g_A_grasp_wrt_base = g_A_model_wrt_base*g_A_grasp_wrt_model;
-                    g_status = PCL_STATUS_IDLE;                    
+                    g_status = PCL_STATUS_IDLE;
                     break;
 
 
@@ -1627,7 +1936,7 @@ int main(int argc, char** argv) {
 
         pcl::toROSMsg(*g_display_cloud, *g_pcl2_display_cloud);
         g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        
-        pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
+        g_pubCloud.publish(g_pcl2_display_cloud); //and also display whatever we choose to put in here
 
         pcl::toROSMsg(*g_canCloud, *g_pcl2_display_cloud);
         g_pcl2_display_cloud->header.stamp = ros::Time::now(); //update the time stamp, so rviz does not complain        

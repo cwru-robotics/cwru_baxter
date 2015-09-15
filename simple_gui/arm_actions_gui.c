@@ -1,5 +1,5 @@
-// compile with:  gcc -o service_call_gui service_call_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
-// must do this from directory simple_gui, so it can find the glade file glade2_example.glade
+// compile with:  gcc -o arm_actions_gui arm_actions_gui.c $(pkg-config --cflags --libs gtk+-2.0 gmodule-2.0)
+// must do this from directory simple_gui, so it can find the glade file arm_actions.glade
 
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -42,6 +42,14 @@ G_MODULE_EXPORT void enable_control_cb(GtkButton *enable_control, gpointer data)
   printf("enabling motor control\n");
     //system("cd ~/home/ros_ws");
     system("rosrun baxter_tools enable_robot.py -e");
+
+}
+
+G_MODULE_EXPORT void disable_robot_cb(GtkButton *disable_robot, gpointer data) 
+{
+  printf("disabling motor control\n");
+    //system("cd ~/home/ros_ws");
+    system("rosrun baxter_tools enable_robot.py -d");
 
 }
 
@@ -184,7 +192,7 @@ main (int argc, char *argv[])
         return( 1 );
     }
 */
-        gtk_builder_add_from_file (builder, "glade2_example.glade", NULL);
+        gtk_builder_add_from_file (builder, "arm_actions.glade", NULL);
         /* window = GTK_WIDGET (gtk_builder_get_object (builder, "window")); */
         window = GTK_WIDGET (gtk_builder_get_object (builder, "window1"));
         gtk_builder_connect_signals (builder, NULL);          
