@@ -5,7 +5,7 @@ The launch files here refer to the cwru-modified baxter.urdf, formerly found in:
 ~/ros_ws/src/rethink/baxter_common/baxter_description/urdf
 
 In first window, run:
-(optirun) `roslaunch cwru_baxter_sim cwru_baxter_world.launch`
+(optirun) `roslaunch cwru_baxter_sim baxter_world.launch`
 
 wait for "gravity compensation was turned off"
 
