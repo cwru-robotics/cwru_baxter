@@ -110,6 +110,7 @@ include_directories(
 ## Declare a cpp executable
 add_executable(image_converter src/image_converter.cpp)
 add_executable(snapshot src/snapshot.cpp)
+add_executable(images_timesync src/images_timesync.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(example_opencv_node example_opencv_generate_messages_cpp)
@@ -119,6 +120,10 @@ target_link_libraries(image_converter ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
  )
 target_link_libraries(snapshot ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+ )
+
+target_link_libraries(images_timesync ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
  )
 
