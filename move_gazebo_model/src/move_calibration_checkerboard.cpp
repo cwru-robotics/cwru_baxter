@@ -98,6 +98,7 @@ int main(int argc, char **argv) {
 
     double dphi = (M_PI*2.0)/nsteps;
 
+/*
    while(ipose<npts) {
         //cout<<"you entered "<<in_name<<endl;
         //des_model_state.pose.position.x+=0.001;
@@ -146,6 +147,40 @@ int main(int argc, char **argv) {
     //cin >>ans_char;
  
     }
+*/
+  // raster across the view in x,y, all horizontal:
+   for (x=-.15;x<0;x+=0.01)
+     for (y=-0.12;y<0;y+=0.01) {
+	quat.x=0;
+	quat.y=0;
+	quat.z=0;
+	quat.w=0;
+	pose.orientation= quat;
+	z = 0.50;
+     	   pose.position.x = x;
+     	   pose.position.y = y;
+     	   pose.position.z = z;
+    	   des_model_state.pose = pose;
+      for (int i=0;i<100;i++) {
+        set_model_state_srv.request.model_state = des_model_state;
+        if (client.call(set_model_state_srv)) {
+            if (set_model_state_srv.response.success) {
+		//ROS_INFO("set model state reports success");
+               
+            } else {
+                ROS_INFO("set model state reports failure");
+            }
+
+        } else {
+            ROS_ERROR("Failed to call service ");
+            return 1;
+        }
+       ros::spinOnce();
+       ros::Duration(0.01).sleep();
+     }
+
+   }
+   //do random skews
    while(true) {
         //cout<<"you entered "<<in_name<<endl;
         //des_model_state.pose.position.x+=0.001;
