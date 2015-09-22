@@ -1,17 +1,11 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(cartesian_moves)
 
-#find_package(catkin_simple REQUIRED)
-
-#catkin_simple()
 find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
 find_package(actionlib REQUIRED)
 find_package(catkin REQUIRED COMPONENTS actionlib_msgs)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   baxter_core_msgs
   roscpp
@@ -32,8 +26,8 @@ include_directories(
   ${PROJECT_NAME}/include
   #${baxter_kinematics_INCLUDE_DIRS}
 )
-add_definitions(${EIGEN_DEFINITIONS})
 
+add_definitions(${EIGEN_DEFINITIONS})
 
 # example boost usage
 find_package(Boost REQUIRED COMPONENTS system thread)
@@ -75,22 +69,30 @@ include_directories(
   src/cart_path_planner_lib.cpp
   ## src/${PROJECT_NAME}/baxter_kinematics.cpp
  )
+
+
 # Executables
+
 #cs_add_executable(goto_prepose src/traj_action_client_pre_pose.cpp)
+
 add_executable(goto_prepose src/traj_action_client_pre_pose.cpp)
 add_executable(cart_traj_as src/cart_move_hand_down_as.cpp)
 add_executable(cart_traj_ac src/cart_traj_action_client.cpp)
+
 #add_executable(test_cart_plan_lib src/test_cart_path_planner_lib.cpp)
 add_executable(arm_motion_interface src/arm_motion_interface.cpp)
 add_executable(cartesian_move_svc_client_test src/cartesian_move_svc_client_test.cpp)
+
 # target_link_library(example my_lib)
+
 target_link_libraries(goto_prepose ${catkin_LIBRARIES})
 target_link_libraries(cart_traj_as ${catkin_LIBRARIES})
 target_link_libraries(cart_traj_ac ${catkin_LIBRARIES})
+
 #target_link_libraries(test_cart_plan_lib cartesian_moves ${catkin_LIBRARIES})
 #wsn...this is the one I end up using
+
 target_link_libraries(arm_motion_interface cartesian_moves ${catkin_LIBRARIES})
 target_link_libraries(cartesian_move_svc_client_test ${catkin_LIBRARIES})
-cs_install()
-cs_export()
-    
+
+add_dependencies(cartesian_moves cwru_srv_gencpp)
