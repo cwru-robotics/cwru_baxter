@@ -115,6 +115,7 @@ add_dependencies(snapshot cwru_srv_gencpp)
 
 add_executable(images_timesync src/images_timesync.cpp)
 add_executable(find_red_pixels src/find_red_pixels_centroid.cpp)
+add_executable(find_blue_pixels src/find_blue_pixels_centroid.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(example_opencv_node example_opencv_generate_messages_cpp)
@@ -133,6 +134,10 @@ target_link_libraries(images_timesync ${OpenCV_LIBRARIES}
  )
 
 target_link_libraries(find_red_pixels ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+ )
+
+target_link_libraries(find_blue_pixels ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
  )
 #############
