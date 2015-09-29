@@ -25,11 +25,11 @@ class ImageSyncher
   {
          //img_left_
       int datasize = msg->data.size();
-      ROS_INFO("data size: %d",datasize);
+      //ROS_INFO("data size: %d",datasize);
       int cpy_datasize = img_left_.data.size();
       if (cpy_datasize!= datasize) {
           img_left_.data.resize(datasize);
-          ROS_INFO("resizing");
+          //ROS_INFO("resizing");
       }
       img_left_ = *msg; // does this work? want to copy the data, but msg is a pointer
       got_new_image_left_=true; 
@@ -37,11 +37,11 @@ class ImageSyncher
    void imageRightCb(const sensor_msgs::ImageConstPtr& msg)
   {
       int datasize = msg->data.size();
-      ROS_INFO("data size: %d",datasize);
+      //ROS_INFO("data size: %d",datasize);
       int cpy_datasize = img_right_.data.size();
       if (cpy_datasize!= datasize) {
           img_right_.data.resize(datasize);
-          ROS_INFO("resizing");
+          //ROS_INFO("resizing");
       }       
       img_right_ = *msg; // does this work? want to copy the data, but msg is a pointer
       got_new_image_right_=true; 
@@ -86,7 +86,7 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "image_converter");
 
   ros::NodeHandle nh;
-    ros::Rate ratetimer(1);
+    ros::Rate ratetimer(60);
   ImageSyncher is(nh);
   while(ros::ok())
   {
