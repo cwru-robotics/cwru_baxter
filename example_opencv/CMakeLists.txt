@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+catkin_package()
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -110,6 +111,8 @@ include_directories(
 ## Declare a cpp executable
 add_executable(image_converter src/image_converter.cpp)
 add_executable(snapshot src/snapshot.cpp)
+add_dependencies(snapshot cwru_srv_gencpp)
+
 add_executable(images_timesync src/images_timesync.cpp)
 add_executable(find_red_pixels src/find_red_pixels_centroid.cpp)
 ## Add cmake target dependencies of the executable/library
@@ -120,6 +123,7 @@ add_executable(find_red_pixels src/find_red_pixels_centroid.cpp)
 target_link_libraries(image_converter ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
  )
+
 target_link_libraries(snapshot ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
  )
