@@ -8,7 +8,7 @@
 // The action message can be found in: .../baxter_traj_streamer/action/traj.action
 // Automated header generation creates multiple headers for message I/O
 // These are referred to by the root name (traj) and appended name (Action)
-#include<baxter_traj_streamer/trajAction.h>
+#include <baxter_traj_streamer/trajAction.h>
 
 using namespace std;
 
@@ -19,6 +19,8 @@ using namespace std;
 //bool working_on_trajectory = false;
 //baxter_core_msgs::JointCommand right_cmd,left_cmd;
 ros::Publisher joint_cmd_pub_right;
+
+ros::Publisher joint_cmd_pub_left;
 
 /* maybe restore this later
 bool trajInterpStatusSvc(cwru_srv::simple_bool_service_messageRequest& request, cwru_srv::simple_bool_service_messageResponse& response) {
@@ -102,6 +104,7 @@ private:
     int g_count; //=0; //just for testing
     bool working_on_trajectory; // = false;
     void cmd_pose_right(Vectorq7x1 qvec);
+    void cmd_pose_left(Vectorq7x1 qvec);
 public:
     trajActionServer(); //define the body of the constructor outside of class definition
 
@@ -175,6 +178,14 @@ void trajActionServer::cmd_pose_right(Vectorq7x1 qvec) {
     joint_cmd_pub_right.publish(right_cmd);
 }
 
+void trajActionServer::cmd_pose_left(Vectorq7x1 qvec) {
+    for (uint i = 0; i < 7; i++)
+    {
+        left_cmd.command[i] = qvec[i];
+    }
+    joint_cmd_pub_left.publish(left_cmd);
+}
+
 void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj_streamer::trajAction>::GoalConstPtr& goal) {
     double traj_clock, dt_segment, dq_segment, delta_q_segment, traj_final_time;
     int isegment;
@@ -182,6 +193,7 @@ void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj
 
     Vectorq7x1 qvec, qvec0, qvec_prev, qvec_new;
 
+    std::cout << "LR: " << goal->left_or_right << std::endl;
     //ROS_INFO("in executeCB");
     //ROS_INFO("goal input is: %d", goal->input);
     //do work here: this is where your interesting code goes
@@ -234,7 +246,10 @@ void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj
         for (int i = 0; i < 7; i++) { //copy from traj point to 7x1 vector
             qvec0[i] = trajectory_point0.positions[i];
         }
-        cmd_pose_right(qvec0); //populate and send out first command  
+        if (goal->left_or_right == 1)
+            cmd_pose_left(qvec0); //populate and send out first command  
+        else
+            cmd_pose_right(qvec0);
         qvec_prev = qvec0;
         cout << "start pt: " << qvec0.transpose() << endl;
     }
@@ -243,7 +258,10 @@ void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj
         // update isegment and qvec according to traj_clock; 
         //if traj_clock>= final_time, use exact end coords and set "working_on_trajectory" to false          
         working_on_trajectory = update_trajectory(traj_clock, new_trajectory, qvec_prev, isegment, qvec_new);
-        cmd_pose_right(qvec_new); // use qvec to populate object and send it to robot
+        if (goal->left_or_right == 1)
+            cmd_pose_left(qvec_new); // use qvec to populate object and send it to robot
+        else
+            cmd_pose_right(qvec_new);
         qvec_prev = qvec_new;
         cout << "traj_clock: " << traj_clock << "; vec:" << qvec_new.transpose() << endl;
         ros::spinOnce();
@@ -259,7 +277,7 @@ int main(int argc, char** argv) {
 
     //publisher is global
     joint_cmd_pub_right = nh.advertise<baxter_core_msgs::JointCommand>("/robot/limb/right/joint_command", 1);
-
+    joint_cmd_pub_left = nh.advertise<baxter_core_msgs::JointCommand>("/robot/limb/left/joint_command", 1);
     /* maybe restore this later...
     ROS_INFO("Initializing Services");
     ros::ServiceServer statusService = nh.advertiseService("trajInterpStatusSvc", trajInterpStatusSvc);
