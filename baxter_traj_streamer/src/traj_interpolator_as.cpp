@@ -32,7 +32,7 @@ bool update_trajectory(double traj_clock, trajectory_msgs::JointTrajectory traje
     int nsegs = trajectory.points.size() - 1;
     double t_subgoal;
     //cout<<"traj_clock = "<<traj_clock<<endl;
-    if (isegment < nsegs) {be
+    if (isegment < nsegs) {
         trajectory_point_to = trajectory.points[isegment + 1];
         t_subgoal = trajectory_point_to.time_from_start.toSec();
         //cout<<"iseg = "<<isegment<<"; t_subgoal = "<<t_subgoal<<endl;
