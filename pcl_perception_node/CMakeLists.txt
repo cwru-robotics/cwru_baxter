@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   tf
+  tf2
 )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -55,10 +56,14 @@ include_directories(
 
 add_executable(pcl_perception_node2 src/pcl_perception_node2.cpp)
 add_executable(bed_of_nails_node src/bed_of_nails_node.cpp)
+add_executable(pcd_save src/pcd_save.cpp)
+add_executable(pcd_transform_and_save src/pcd_save.cpp)
 
 # target_link_library(example my_lib)
 target_link_libraries(pcl_perception_node2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(bed_of_nails_node ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(pcd_save ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(pcd_transform_and_save ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_dependencies(pcl_perception_node2 cwru_srv_gencpp)
 add_dependencies(bed_of_nails_node cwru_srv_gencpp)
