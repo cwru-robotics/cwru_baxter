@@ -16,5 +16,5 @@
   <!-- wsn: transform for kinect -->
 <node pkg="tf" type="static_transform_publisher" name="camera_link_frame_bdcst" args="0 0 0  0 0 0 1 kinect_link camera_link 100"/>
 <node pkg="tf" type="static_transform_publisher" name="kinect_calib" args="0 0 0 -0.500 0.500 -0.500 0.500 kinect_link kinect_pc_frame 100"/>
-
+<include file ="$(find cwru_baxter_launch)/yale_gripper_xform.launch"/>
 </launch>
