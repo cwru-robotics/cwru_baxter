@@ -4,6 +4,10 @@
 //   transformTFToEigen();
 //   transform_kinect_cloud();
 //   save_transformed_kinect_snapshot();
+// run this w/:
+// roslaunch cwru_baxter_sim baxter_world.launch
+// roslaunch cwru_baxter_sim kinect_xform.launch
+// rosrun cwru_pcl_utils 
 
 #include <cwru_pcl_utils/cwru_pcl_utils.h>
 

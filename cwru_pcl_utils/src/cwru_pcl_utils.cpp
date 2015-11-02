@@ -95,6 +95,8 @@ void CwruPclUtils::fit_points_to_plane(Eigen::MatrixXf points_mat,Eigen::Vector3
     
 }
 
+//get pts from cloud, pack the points into an Eigen::MatrixXf, then use above
+// fit_points_to_plane fnc
 void CwruPclUtils::fit_points_to_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,Eigen::Vector3f &plane_normal, double &plane_dist) {
     Eigen::MatrixXf points_mat;
     Eigen::Vector3f cloud_pt;
@@ -162,6 +164,7 @@ void CwruPclUtils::transform_selected_points_cloud(Eigen::Affine3f A) {
     transform_cloud(A,pclSelectedPoints_ptr_, pclTransformedSelectedPoints_ptr_);
 }
 
+//need to fix this to put proper frame_id in header
 void CwruPclUtils::transform_cloud(Eigen::Affine3f A,pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr, 
         pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud_ptr) {
     output_cloud_ptr->header = input_cloud_ptr->header;
@@ -190,6 +193,15 @@ void CwruPclUtils::initializeSubscribers()
     
    // subscribe to "selected_points", which is published by Rviz tool
     selected_points_subscriber_ = nh_.subscribe<sensor_msgs::PointCloud2> ("/selected_points", 1, &CwruPclUtils::selectCB,this);    
+}
+
+//member helper function to set up publishers;
+void CwruPclUtils::initializePublishers()
+{
+    ROS_INFO("Initializing Publishers");
+    pointcloud_publisher_ = nh_.advertise<sensor_msgs::PointCloud2>("cwru_pcl_pointcloud", 1, true); 
+    //add more publishers, as needed
+    // note: COULD make minimal_publisher_ a public member function, if want to use it within "main()"
 }
 
 /**

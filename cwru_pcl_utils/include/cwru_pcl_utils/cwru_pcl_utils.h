@@ -90,7 +90,7 @@ private:
     ros::Subscriber selected_points_subscriber_; // this to subscribe to "selectedPoints" topic from Rviz
     
     //ros::ServiceServer minimal_service_; //maybe want these later
-    //ros::Publisher  minimal_publisher_;
+    ros::Publisher  pointcloud_publisher_;
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclKinect_ptr_; //(new PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformed_ptr_;
@@ -101,7 +101,7 @@ private:
     bool got_selected_points_;
     // member methods as well:
     void initializeSubscribers(); // we will define some helper methods to encapsulate the gory details of initializing subscribers, publishers and services
-    //void initializePublishers();
+    void initializePublishers();
     //void initializeServices();
     
     void kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); //prototype for callback fnc

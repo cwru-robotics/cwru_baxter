@@ -38,6 +38,9 @@ rosrun coordinator coordinator
 SIMPLE GUI:
 ~/ros_ws/src/cwru_baxter/simple_GUI$ ./service_call_gui
 
+ENABLE ROBOT:
+`rosrun baxter_tools enable_robot.py -e`
+
 
 
 
