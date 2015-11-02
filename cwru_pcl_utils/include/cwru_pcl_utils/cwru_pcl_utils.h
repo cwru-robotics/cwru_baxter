@@ -55,9 +55,11 @@ public:
      * @param plane_normal output: this function will compute components of the plane normal here
      * @param plane_dist output: scalar (signed) distance of the plane from the origin
      */
-    void fit_points_to_plane(Eigen::MatrixXd points_array, 
-        Eigen::Vector3d &plane_normal, 
+    void fit_points_to_plane(Eigen::MatrixXf points_array, 
+        Eigen::Vector3f &plane_normal, 
         double &plane_dist); 
+    void fit_points_to_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,Eigen::Vector3f &plane_normal, double &plane_dist);
+    void fit_xformed_selected_pts_to_plane(Eigen::Vector3f &plane_normal, double &plane_dist);  
 
 // 
 // 
@@ -71,8 +73,13 @@ public:
      */    
     Eigen::Affine3f transformTFToEigen(const tf::Transform &t);
     void transform_kinect_cloud(Eigen::Affine3f A);
+    void transform_selected_points_cloud(Eigen::Affine3f A);
+    void transform_cloud(Eigen::Affine3f A,pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr, 
+        pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud_ptr);    
     void reset_got_kinect_cloud() {got_kinect_cloud_= false;};
-    bool get_got_kinect_cloud() { return got_kinect_cloud_; };
+    void reset_got_selected_points() {got_selected_points_= false;};    
+    bool got_kinect_cloud() { return got_kinect_cloud_; };
+    bool got_selected_points() {return got_selected_points_;};
     void save_kinect_snapshot() {    pcl::io::savePCDFileASCII ("kinect_snapshot.pcd", *pclKinect_ptr_);};
     void save_transformed_kinect_snapshot() { pcl::io::savePCDFileASCII ("xformed_kinect_snapshot.pcd", *pclTransformed_ptr_);};
 
@@ -80,20 +87,25 @@ private:
     ros::NodeHandle nh_; 
     // some objects to support subscriber, service, and publisher
     ros::Subscriber pointcloud_subscriber_; //use this to subscribe to a pointcloud topic
+    ros::Subscriber selected_points_subscriber_; // this to subscribe to "selectedPoints" topic from Rviz
+    
     //ros::ServiceServer minimal_service_; //maybe want these later
-    //ros::Publisher  minimal_publisher_;
+    ros::Publisher  pointcloud_publisher_;
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclKinect_ptr_; //(new PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformed_ptr_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pclSelectedPoints_ptr_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformedSelectedPoints_ptr_;
     
     bool got_kinect_cloud_;
+    bool got_selected_points_;
     // member methods as well:
     void initializeSubscribers(); // we will define some helper methods to encapsulate the gory details of initializing subscribers, publishers and services
-    //void initializePublishers();
+    void initializePublishers();
     //void initializeServices();
     
     void kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); //prototype for callback fnc
-    
+    void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); // callback for selected points    
     //prototype for example service
     //bool serviceCallback(example_srv::simple_bool_service_messageRequest& request, example_srv::simple_bool_service_messageResponse& response);
 

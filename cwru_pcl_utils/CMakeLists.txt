@@ -23,8 +23,8 @@ cs_add_library(cwru_pcl_utils src/cwru_pcl_utils.cpp)
 # Executables
 # cs_add_executable(example src/example.cpp)
 # target_link_library(example my_lib)
-#cs_add_executable(cwru_pcl_utils_example_main src/cwru_pcl_utils_example_main.cpp)
-#target_link_libraries(cwru_pcl_utils_example_main cwru_pcl_utils ${catkin_LIBRARIES})
+cs_add_executable(cwru_pcl_utils_example_main src/cwru_pcl_utils_example_main.cpp)
+target_link_libraries(cwru_pcl_utils_example_main cwru_pcl_utils ${catkin_LIBRARIES})
 
 cs_install()
 cs_export()
