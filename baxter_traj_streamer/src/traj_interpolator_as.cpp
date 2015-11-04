@@ -162,13 +162,8 @@ void trajActionServer::cmd_pose_right(Vectorq7x1 qvec) {
 
 //this is where the bulk of the work is done, interpolating between potentially coarse joint-space poses
 // using the specified arrival times
-<<<<<<< HEAD
-void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj_streamer::trajAction>::GoalConstPtr& goal) {
-    double traj_clock;
-=======
 void trajActionServer::executeCB(const actionlib::SimpleActionServer<cwru_action::trajAction>::GoalConstPtr& goal) {
     double traj_clock, dt_segment, dq_segment, delta_q_segment, traj_final_time;
->>>>>>> cwru-robotics/master
     int isegment;
     trajectory_msgs::JointTrajectoryPoint trajectory_point0;
 
