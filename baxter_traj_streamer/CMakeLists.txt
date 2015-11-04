@@ -12,16 +12,14 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   trajectory_msgs
-  baxter_kinematics
-  cwru_joint_space_planner
   cwru_srv
+  cwru_action
   actionlib_msgs  
 )
 
 include_directories(
   ${Eigen_INCLUDE_DIRS}
   ${PROJECT_NAME}/include
-  #${baxter_kinematics_INCLUDE_DIRS}
 )
 
 add_definitions(${EIGEN_DEFINITIONS})
@@ -32,26 +30,22 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 find_package(Boost REQUIRED COMPONENTS system)
 
 ## Generate actions in the 'action' folder
-add_action_files(
-  #DIRECTORY baxter_traj_streamer
-  FILES
-  traj.action
-)
+#add_action_files(
+#  FILES
+#  traj.action
+#)
 
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-   DEPENDENCIES
-   actionlib_msgs trajectory_msgs std_msgs cwru_srv)
-#   sensor_msgs
-#   std_msgs
-#   trajectory_msgs
-# )
+#generate_messages(
+#   DEPENDENCIES
+#   actionlib_msgs trajectory_msgs std_msgs cwru_srv)
+
 
 catkin_package(
   INCLUDE_DIRS include 
-  LIBRARIES ${PROJECT_NAME} cwru_joint_space_planner actionlib
-  CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_joint_space_planner baxter_kinematics cwru_srv   actionlib_msgs 
+  LIBRARIES ${PROJECT_NAME}  actionlib
+  CATKIN_DEPENDS roscpp std_msgs sensor_msgs baxter_core_msgs trajectory_msgs cwru_srv cwru_action  actionlib_msgs 
   DEPENDS eigen system_lib actionlib
 )
 
@@ -67,11 +61,7 @@ include_directories(
 # )
  add_library(
   ${PROJECT_NAME}  
-  ##src/cwru_baxter/baxter_kinematics/src/baxter_kinematics.cpp
-  ##${PROJECT_NAME}/src/baxter_kinematics.cpp
-  ##${${PROJECT_NAME}_SRCS}
   src/baxter_traj_streamer.cpp
-  ## src/${PROJECT_NAME}/baxter_kinematics.cpp
  )
 ## Declare a cpp executable
 # add_executable(baxter_traj_streamer_node src/baxter_traj_streamer_node.cpp)
@@ -80,12 +70,14 @@ include_directories(
 #add_executable(elbow_orbit_plan_main src/elbow_orbit_plan_main.cpp)
 #add_executable(elbow_orbit_plan_main2 src/elbow_orbit_plan_main2.cpp)
 #add_executable(test_init_cmd src/test_init_cmd_main.cpp)
-add_executable(traj_interpolator_as src/traj_interpolator_as.cpp)
 #add_executable(traj_action_client src/traj_action_client.cpp)
+
+add_executable(traj_interpolator_as src/traj_interpolator_as.cpp)
 add_executable(traj_action_client_pre_pose src/traj_action_client_pre_pose.cpp)
+
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(traj_action_client_pre_pose baxter_traj_streamer_generate_messages_cpp)
+#add_dependencies(traj_action_client_pre_pose)
 add_dependencies(traj_interpolator_as baxter_traj_streamer_generate_messages_cpp)
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(baxter_traj_streamer_node
@@ -98,10 +90,10 @@ add_dependencies(traj_interpolator_as baxter_traj_streamer_generate_messages_cpp
 #target_link_libraries(elbow_orbit_plan_main baxter_traj_streamer  ${catkin_LIBRARIES})
 #target_link_libraries(elbow_orbit_plan_main2 baxter_traj_streamer  ${catkin_LIBRARIES})
 #target_link_libraries(test_init_cmd baxter_traj_streamer  ${catkin_LIBRARIES})
-target_link_libraries(traj_interpolator_as baxter_traj_streamer  ${catkin_LIBRARIES})
 #target_link_libraries(traj_action_client  ${catkin_LIBRARIES})
+
+target_link_libraries(traj_interpolator_as baxter_traj_streamer  ${catkin_LIBRARIES})
 target_link_libraries(traj_action_client_pre_pose baxter_traj_streamer ${catkin_LIBRARIES})
-#cwru_joint_space_planner
 
 add_dependencies(baxter_traj_streamer baxter_core_msgs_gencpp)
 

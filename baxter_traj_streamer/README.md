@@ -15,4 +15,6 @@ values for dt_traj and max velocities are set in header, baxter_traj_streamer.h
 
 See traj_action_client_pre_pose.cpp for example of how to use this action server
 
+NOTE: on 11/3/15, moved the action message to cwru_action package
+
 

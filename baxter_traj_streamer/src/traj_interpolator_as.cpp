@@ -8,8 +8,8 @@
 // The action message can be found in: .../baxter_traj_streamer/action/traj.action
 // Automated header generation creates multiple headers for message I/O
 // These are referred to by the root name (traj) and appended name (Action)
-#include<baxter_traj_streamer/trajAction.h>
-
+//#include<baxter_traj_streamer/trajAction.h>
+#include<cwru_action/trajAction.h>
 using namespace std;
 
 
@@ -85,12 +85,12 @@ private:
     // this class will own a "SimpleActionServer" called "as_".
     // it will communicate using messages defined in baxter_traj_streamer/action/traj.action
     // the type "trajAction" is auto-generated from our name "traj" and generic name "Action"
-    actionlib::SimpleActionServer<baxter_traj_streamer::trajAction> as_;
+    actionlib::SimpleActionServer<cwru_action::trajAction> as_;
 
     // here are some message types to communicate with our client(s)
-    baxter_traj_streamer::trajGoal goal_; // goal message, received from client
-    baxter_traj_streamer::trajResult result_; // put results here, to be sent back to the client when done w/ goal
-    baxter_traj_streamer::trajFeedback feedback_; // not used in this example; 
+    cwru_action::trajGoal goal_; // goal message, received from client
+    cwru_action::trajResult result_; // put results here, to be sent back to the client when done w/ goal
+    cwru_action::trajFeedback feedback_; // not used in this example; 
     // would need to use: as_.publishFeedback(feedback_);
     baxter_core_msgs::JointCommand right_cmd, left_cmd;
     trajectory_msgs::JointTrajectory new_trajectory; // member var to receive new traj's;
@@ -103,7 +103,7 @@ public:
     ~trajActionServer(void) {
     }
     // Action Interface
-    void executeCB(const actionlib::SimpleActionServer<baxter_traj_streamer::trajAction>::GoalConstPtr& goal);
+    void executeCB(const actionlib::SimpleActionServer<cwru_action::trajAction>::GoalConstPtr& goal);
 };
 
 
@@ -162,8 +162,13 @@ void trajActionServer::cmd_pose_right(Vectorq7x1 qvec) {
 
 //this is where the bulk of the work is done, interpolating between potentially coarse joint-space poses
 // using the specified arrival times
+<<<<<<< HEAD
 void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj_streamer::trajAction>::GoalConstPtr& goal) {
     double traj_clock;
+=======
+void trajActionServer::executeCB(const actionlib::SimpleActionServer<cwru_action::trajAction>::GoalConstPtr& goal) {
+    double traj_clock, dt_segment, dq_segment, delta_q_segment, traj_final_time;
+>>>>>>> cwru-robotics/master
     int isegment;
     trajectory_msgs::JointTrajectoryPoint trajectory_point0;
 
@@ -174,7 +179,7 @@ void trajActionServer::executeCB(const actionlib::SimpleActionServer<baxter_traj
 
     g_count++; // keep track of total number of goals serviced since this server was started
     result_.return_val = g_count; // we'll use the member variable result_, defined in our class
-    result_.traj_id = goal->traj_id;
+    //result_.traj_id = goal->traj_id;
     //cout<<"received trajectory w/ "<<goal->trajectory.points.size()<<" points"<<endl;
     // copy trajectory to global var:
     new_trajectory = goal->trajectory; // 

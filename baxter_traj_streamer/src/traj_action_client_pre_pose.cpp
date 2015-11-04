@@ -12,16 +12,16 @@
 // these are referred to by the root name (traj) and appended name (Action)
 // If you write a new client of the server in this package, you will need to include baxter_traj_streamer in your package.xml,
 // and include the header file below
-#include<baxter_traj_streamer/trajAction.h>
+#include<cwru_action/trajAction.h>
 using namespace std;
 #define VECTOR_DIM 7 // e.g., a 7-dof vector
 
 // This function will be called once when the goal completes
 // this is optional, but it is a convenient way to get access to the "result" message sent by the server
 void doneCb(const actionlib::SimpleClientGoalState& state,
-        const baxter_traj_streamer::trajResultConstPtr& result) {
+        const cwru_action::trajResultConstPtr& result) {
     ROS_INFO(" doneCb: server responded with state [%s]", state.toString().c_str());
-    ROS_INFO("got return val = %d; traj_id = %d",result->return_val,result->traj_id);
+    ROS_INFO("got return val = %d",result->return_val);
 }
 
 
@@ -65,13 +65,13 @@ int main(int argc, char** argv) {
     cout << "stuffing traj: " << endl;
     baxter_traj_streamer.stuff_trajectory(des_path, des_trajectory); //convert from vector of 7dof poses to trajectory message        
         // here is a "goal" object compatible with the server, as defined in example_action_server/action
-        baxter_traj_streamer::trajGoal goal; 
-        // does this work?  copy traj to goal:
+        cwru_action::trajGoal goal; 
+        //  copy traj to goal:
         goal.trajectory = des_trajectory;
         //cout<<"ready to connect to action server; enter 1: ";
         //cin>>ans;
         // use the name of our server, which is: trajActionServer (named in traj_interpolator_as.cpp)
-        actionlib::SimpleActionClient<baxter_traj_streamer::trajAction> action_client("trajActionServer", true);
+        actionlib::SimpleActionClient<cwru_action::trajAction> action_client("trajActionServer", true);
         
         // attempt to connect to the server:
         ROS_INFO("waiting for server: ");
@@ -90,9 +90,9 @@ int main(int argc, char** argv) {
 
         //while(true) {
         // stuff a goal message:
-        g_count++;
-        goal.traj_id = g_count; // this merely sequentially numbers the goals sent
-        ROS_INFO("sending traj_id %d",g_count);
+        //g_count++;
+        //goal.traj_id = g_count; // this merely sequentially numbers the goals sent
+        //ROS_INFO("sending traj_id %d",g_count);
         //action_client.sendGoal(goal); // simple example--send goal, but do not specify callbacks
         action_client.sendGoal(goal,&doneCb); // we could also name additional callback functions here, if desired
         //    action_client.sendGoal(goal, &doneCb, &activeCb, &feedbackCb); //e.g., like this
