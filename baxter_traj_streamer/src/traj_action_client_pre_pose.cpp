@@ -12,6 +12,8 @@
 // these are referred to by the root name (traj) and appended name (Action)
 // If you write a new client of the server in this package, you will need to include baxter_traj_streamer in your package.xml,
 // and include the header file below
+// Nov 3, 2015 update: moved action message to cwru_action...
+// all code using this streamer will need to include cwru_action and use action message here
 #include<cwru_action/trajAction.h>
 using namespace std;
 #define VECTOR_DIM 7 // e.g., a 7-dof vector

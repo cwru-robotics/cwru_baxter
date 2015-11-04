@@ -9,6 +9,9 @@
 // Automated header generation creates multiple headers for message I/O
 // These are referred to by the root name (traj) and appended name (Action)
 //#include<baxter_traj_streamer/trajAction.h>
+
+// Nov 3, 2015 update: moved action message to cwru_action...
+// all code using this streamer will need to include cwru_action and use action message here
 #include<cwru_action/trajAction.h>
 using namespace std;
 
