@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     Eigen::Affine3d Affine_flange_wrt_utorso = baxter_fwd_solver.fwd_kin_flange_wrt_torso_solve(q_snapshot);
     
     std::vector<Vectorq7x1> q_solns;    
-    int nsolns = baxter_IK_solver.ik_solve_approx(Affine_flange_wrt_utorso,q_solns);  
+    int nsolns = baxter_IK_solver.ik_solve_approx_wrt_torso(Affine_flange_wrt_utorso,q_solns);  
     cout<<"num solns: "<<nsolns<<endl;  
     
     //return 0;
