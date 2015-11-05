@@ -57,7 +57,7 @@ include_directories(
 add_executable(pcl_perception_node2 src/pcl_perception_node2.cpp)
 add_executable(bed_of_nails_node src/bed_of_nails_node.cpp)
 add_executable(pcd_save src/pcd_save.cpp)
-add_executable(pcd_transform_and_save src/pcd_save.cpp)
+add_executable(pcd_transform_and_save src/pcd_transform_and_save.cpp)
 
 # target_link_library(example my_lib)
 target_link_libraries(pcl_perception_node2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})

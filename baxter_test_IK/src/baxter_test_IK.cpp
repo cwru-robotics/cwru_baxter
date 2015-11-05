@@ -1,4 +1,4 @@
-// baxter_kinematics_test_main5.cpp
+// baxter_test_IK.cpp
 // wsn, Nov 2015
 // test function for baxter_kinematics library
 // this version uses trajectory interpolation action server from baxter_traj_streamer package
