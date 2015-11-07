@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(baxter_test_IK)
+project(baxter_test_ik)
 
 find_package(catkin_simple REQUIRED)
 find_package(cmake_modules REQUIRED)
@@ -20,7 +20,7 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 # cs_add_library(my_lib src/my_lib.cpp)   
 
 # Executables
-cs_add_executable(baxter_test_IK src/baxter_test_IK.cpp)
+cs_add_executable(baxter_test_ik src/baxter_test_IK.cpp)
 #target_link_library(example my_lib)
 
 cs_install()
