@@ -82,7 +82,11 @@ public:
     bool got_selected_points() {return got_selected_points_;};
     void save_kinect_snapshot() {    pcl::io::savePCDFileASCII ("kinect_snapshot.pcd", *pclKinect_ptr_);};
     void save_transformed_kinect_snapshot() { pcl::io::savePCDFileASCII ("xformed_kinect_snapshot.pcd", *pclTransformed_ptr_);};
-
+    void get_transformed_selected_points(pcl::PointCloud<pcl::PointXYZ> & outputCloud );
+    void copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, PointCloud<pcl::PointXYZ>::Ptr outputCloud); 
+    void get_gen_purpose_cloud(pcl::PointCloud<pcl::PointXYZ> & outputCloud );    
+    void example_pcl_operation();
+    
 private:
     ros::NodeHandle nh_; 
     // some objects to support subscriber, service, and publisher
@@ -96,6 +100,7 @@ private:
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformed_ptr_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclSelectedPoints_ptr_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformedSelectedPoints_ptr_;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr pclGenPurposeCloud_ptr_;
     
     bool got_kinect_cloud_;
     bool got_selected_points_;
