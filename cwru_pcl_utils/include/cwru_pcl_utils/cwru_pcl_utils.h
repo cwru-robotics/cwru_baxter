@@ -22,6 +22,8 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/TransformStamped.h>
 
+#include <cwru_msgs/PatchParams.h>
+
 #include <tf/transform_listener.h>  // transform listener headers
 #include <tf/transform_broadcaster.h>
 
@@ -58,6 +60,8 @@ public:
     void fit_points_to_plane(Eigen::MatrixXf points_array, 
         Eigen::Vector3f &plane_normal, 
         double &plane_dist); 
+    Eigen::Vector3f compute_centroid(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr);
+    
     void fit_points_to_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr,Eigen::Vector3f &plane_normal, double &plane_dist);
     void fit_xformed_selected_pts_to_plane(Eigen::Vector3f &plane_normal, double &plane_dist);  
 
@@ -92,9 +96,11 @@ private:
     // some objects to support subscriber, service, and publisher
     ros::Subscriber pointcloud_subscriber_; //use this to subscribe to a pointcloud topic
     ros::Subscriber selected_points_subscriber_; // this to subscribe to "selectedPoints" topic from Rviz
+
     
     //ros::ServiceServer minimal_service_; //maybe want these later
     ros::Publisher  pointcloud_publisher_;
+    ros::Publisher patch_publisher_;    
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclKinect_ptr_; //(new PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformed_ptr_;

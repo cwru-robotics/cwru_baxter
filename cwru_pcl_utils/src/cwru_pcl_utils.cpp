@@ -8,23 +8,27 @@ CwruPclUtils::CwruPclUtils(ros::NodeHandle* nodehandle) : nh_(*nodehandle), pclK
 pclTransformed_ptr_(new PointCloud<pcl::PointXYZ>), pclSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),
 pclTransformedSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),pclGenPurposeCloud_ptr_(new PointCloud<pcl::PointXYZ>) {
     initializeSubscribers();
+    initializePublishers();
     got_kinect_cloud_ = false;
     got_selected_points_ = false;
 }
 
+
+
+
 void CwruPclUtils::fit_points_to_plane(Eigen::MatrixXf points_mat, Eigen::Vector3f &plane_normal, double &plane_dist) {
     //ROS_INFO("starting identification of plane from data: ");
+    int npts = points_mat.cols(); // number of points = number of columns in matrix; check the size
+    
     // first compute the centroid of the data:
     Eigen::Vector3f centroid;
-    // here's a handy way to initialize data to all zeros; more variants exist
     centroid = Eigen::MatrixXf::Zero(3, 1); // see http://eigen.tuxfamily.org/dox/AsciiQuickReference.txt
-    //add all the points together:
-    int npts = points_mat.cols(); // number of points = number of columns in matrix; check the size
-    //cout<<"matrix has ncols = "<<npts<<endl;
-    for (int ipt = 0; ipt < npts; ipt++) {
+    
+    //centroid = compute_centroid(points_mat);
+     for (int ipt = 0; ipt < npts; ipt++) {
         centroid += points_mat.col(ipt); //add all the column vectors together
     }
-    centroid /= npts; //divide by the number of points to get the centroid
+    centroid /= npts; //divide by the number of points to get the centroid    
     //cout<<"centroid: "<<centroid.transpose()<<endl;
 
 
@@ -116,10 +120,40 @@ void CwruPclUtils::fit_points_to_plane(pcl::PointCloud<pcl::PointXYZ>::Ptr input
 
 }
 
+//compute and return the centroid of a pointCloud
+Eigen::Vector3f  CwruPclUtils::compute_centroid(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_ptr) {
+    Eigen::Vector3f centroid;
+    Eigen::Vector3f cloud_pt;   
+    int npts = input_cloud_ptr->points.size();    
+    centroid<<0,0,0;
+    //add all the points together:
+
+    for (int ipt = 0; ipt < npts; ipt++) {
+        cloud_pt = input_cloud_ptr->points[ipt].getVector3fMap();
+        centroid += cloud_pt; //add all the column vectors together
+    }
+    centroid/= npts; //divide by the number of points to get the centroid
+    return centroid;
+}
+
 // this fnc operates on transformed selected points
 
 void CwruPclUtils::fit_xformed_selected_pts_to_plane(Eigen::Vector3f &plane_normal, double &plane_dist) {
     fit_points_to_plane(pclTransformedSelectedPoints_ptr_, plane_normal, plane_dist);
+    Eigen::Vector3f centroid;
+    cwru_msgs::PatchParams patch_params_msg;
+    //compute the centroid; this is redundant w/ computation inside fit_points...oh well.
+    centroid = compute_centroid(pclTransformedSelectedPoints_ptr_);
+
+    patch_params_msg.offset = plane_dist;
+    patch_params_msg.centroid.resize(3);
+    patch_params_msg.normal_vec.resize(3);
+    for (int i=0;i<3;i++) {
+        patch_params_msg.normal_vec[i]=plane_normal[i];
+        patch_params_msg.centroid[i]= centroid[i];
+    }
+    patch_params_msg.frame_id = "torso";
+    patch_publisher_.publish(patch_params_msg);
 }
 
 Eigen::Affine3f CwruPclUtils::transformTFToEigen(const tf::Transform &t) {
@@ -266,6 +300,7 @@ void CwruPclUtils::initializeSubscribers() {
 void CwruPclUtils::initializePublishers() {
     ROS_INFO("Initializing Publishers");
     pointcloud_publisher_ = nh_.advertise<sensor_msgs::PointCloud2>("cwru_pcl_pointcloud", 1, true);
+    patch_publisher_ = nh_.advertise<cwru_msgs::PatchParams>("pcl_patch_params", 1, true);
     //add more publishers, as needed
     // note: COULD make minimal_publisher_ a public member function, if want to use it within "main()"
 }
