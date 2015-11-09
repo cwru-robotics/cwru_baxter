@@ -60,6 +60,15 @@ const double Lx_hand = -0.03;
 const double Lz_hand = 0.120;
 const double theta_yaw_hand= -0.24;
 
+/* need to make this consistent with transform publisher in: cwru_baxter_launch/yale_gripper_xform.launch
+ * check w/:
+rosrun tf tf_echo right_hand yale_gripper_frame
+At time 1440173202.403
+- Translation: [-0.030, 0.000, 0.120]
+- Rotation: in Quaternion [0.000, 0.000, -0.120, 0.993]
+            in RPY (radian) [0.000, 0.000, -0.240]
+            in RPY (degree) [0.000, 0.000, -13.751]
+ */
 // these values for RIGHT ARM
 const double DH_a1=0.069;
 const double DH_a2=0.0;

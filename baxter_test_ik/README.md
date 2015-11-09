@@ -13,6 +13,6 @@ A simple action client sends trajectory goals to the trajectory interpolation ac
 `roslaunch cwru_baxter_sim baxter_world.launch`
 `rosrun baxter_tools enable_robot.py -e` (runs to completion)
 `rosrun baxter_traj_streamer traj_interpolator_as`(action server stays alive)
-`rosrun baxter_test_IK baxter_test_IK`  (runs to completion after many motion commands)
+`rosrun baxter_test_ik baxter_test_ik`  (runs to completion after many motion commands)
 
     
