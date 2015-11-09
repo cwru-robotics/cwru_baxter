@@ -19,7 +19,7 @@ This illustrates sending commands for:
 `roslaunch cwru_baxter_sim baxter_world.launch` (or start real robot)
 `rosrun baxter_traj_streamer  traj_interpolator_as`
 `rosrun baxter_tools enable_robot.py -e`
-`rosrun cwru_baxter_launch yale_gripper_xform.launch` (to see gripper frame in rviz)
+`roslaunch cwru_baxter_launch yale_gripper_xform.launch` (to see gripper frame in rviz)
 `rosrun baxter_cartesian_moves baxter_cart_move_as`
 `rosrun baxter_cartesian_moves example_baxter_cart_move_action_client`
 ## Running tests/demos
