@@ -85,6 +85,8 @@ public:
     bool got_kinect_cloud() { return got_kinect_cloud_; };
     bool got_selected_points() {return got_selected_points_;};
     void save_kinect_snapshot() {    pcl::io::savePCDFileASCII ("kinect_snapshot.pcd", *pclKinect_ptr_);};
+    //alternative "save" fnc: save as a colored pointcloud
+    void save_kinect_clr_snapshot() {pcl::io::savePCDFileASCII ("kinect_clr_snapshot.pcd", *pclKinect_clr_ptr_);};
     void save_transformed_kinect_snapshot() { pcl::io::savePCDFileASCII ("xformed_kinect_snapshot.pcd", *pclTransformed_ptr_);};
     void get_transformed_selected_points(pcl::PointCloud<pcl::PointXYZ> & outputCloud );
     void copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, PointCloud<pcl::PointXYZ>::Ptr outputCloud); 
@@ -101,7 +103,9 @@ private:
     //ros::ServiceServer minimal_service_; //maybe want these later
     ros::Publisher  pointcloud_publisher_;
     ros::Publisher patch_publisher_;    
-
+    
+    
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr pclKinect_clr_ptr_; //pointer for color version of pointcloud
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclKinect_ptr_; //(new PointCloud<pcl::PointXYZ>);
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclTransformed_ptr_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pclSelectedPoints_ptr_;

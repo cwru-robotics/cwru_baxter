@@ -5,6 +5,7 @@
 //uses initializer list for member vars
 
 CwruPclUtils::CwruPclUtils(ros::NodeHandle* nodehandle) : nh_(*nodehandle), pclKinect_ptr_(new PointCloud<pcl::PointXYZ>),
+        pclKinect_clr_ptr_(new PointCloud<pcl::PointXYZRGB>),
 pclTransformed_ptr_(new PointCloud<pcl::PointXYZ>), pclSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),
 pclTransformedSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),pclGenPurposeCloud_ptr_(new PointCloud<pcl::PointXYZ>) {
     initializeSubscribers();
@@ -314,6 +315,7 @@ void CwruPclUtils::kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     // convert/copy the cloud only if desired
     if (!got_kinect_cloud_) {
         pcl::fromROSMsg(*cloud, *pclKinect_ptr_);
+        pcl::fromROSMsg(*cloud,*pclKinect_clr_ptr_);
         ROS_INFO("kinectCB: got cloud with %d * %d points", (int) pclKinect_ptr_->width, (int) pclKinect_ptr_->height);
         got_kinect_cloud_ = true; //cue to "main" that callback received and saved a pointcloud        
     }

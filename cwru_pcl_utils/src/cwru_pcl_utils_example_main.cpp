@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
     ROS_INFO("got a pointcloud");
     ROS_INFO("saving pointcloud");
     cwru_pcl_utils.save_kinect_snapshot();
+    cwru_pcl_utils.save_kinect_clr_snapshot();  // save color version of pointcloud as well
 
     //set up a publisher to display clouds in rviz:
     ros::Publisher pubCloud = nh.advertise<sensor_msgs::PointCloud2> ("/pcl_cloud_display", 1);
@@ -61,6 +62,7 @@ int main(int argc, char** argv) {
     cwru_pcl_utils.transform_kinect_cloud(A_sensor_wrt_torso);
     //save this transformed data to disk:
     cwru_pcl_utils.save_transformed_kinect_snapshot();
+    
     Eigen::Vector3f plane_normal;
     double plane_dist;
     while (ros::ok()) {
