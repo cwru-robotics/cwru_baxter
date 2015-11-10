@@ -1,6 +1,5 @@
 // wsn, October, 2014
 // joint-space planner, organized as a class
-// problem with this:  
 
 #include "joint_space_planner.h"
 using namespace std;

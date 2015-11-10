@@ -1,6 +1,8 @@
 // cart_path_planner_lib: 
 // wsn, June, 2015
 // a library of arm-motion planning functions
+// uses cwru_joint_space_planner/joint_space_planner to find a good joint-space path among options
+// from IK solutions
 #include <cartesian_moves/cart_path_planner_lib.h>
 
 //constructor:
