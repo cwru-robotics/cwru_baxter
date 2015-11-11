@@ -9,8 +9,9 @@
   <!--wait for simulator or robot to come up-->
 <!--if real robot, also need to run "baxter_master" to set remote roscore host -->
 
-<!-- enable the robot for motion commands, using: -->
-<!--rosrun baxter_tools enable_robot.py -e -->
+<!-- enable the robot for motion commands-->
+<node pkg="baxter_tools" type = "enable_robot.py" name="enable_robot" args="-e"/>
+
 
 <!-- after robot is running and enabled, start up these nodes -->
 <!-- tool transform publisher -->
