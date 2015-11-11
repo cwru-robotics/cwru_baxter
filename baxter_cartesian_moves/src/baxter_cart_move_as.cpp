@@ -251,7 +251,7 @@ void ArmMotionInterface::executeCB(const actionlib::SimpleActionServer<cwru_acti
     switch (command_mode_) {
         case cwru_action::cwru_baxter_cart_moveGoal::ARM_TEST_MODE:
             ROS_INFO("responding to request TEST_MODE: ");
-            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
             cart_move_as_.setSucceeded(cart_result_);
             break;
         //looks up current right-arm joint angles and returns them to client
@@ -262,7 +262,7 @@ void ArmMotionInterface::executeCB(const actionlib::SimpleActionServer<cwru_acti
             for (int i=0;i<7;i++) {
                 cart_result_.q_arm_right[i] = q_vec_right_arm_Xd_[i];
             }
-                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
                 cart_move_as_.setSucceeded(cart_result_);            
             break;
             
@@ -270,7 +270,7 @@ void ArmMotionInterface::executeCB(const actionlib::SimpleActionServer<cwru_acti
             ROS_INFO("responding to request RT_ARM_GET_TOOL_POSE");
             compute_right_tool_stamped_pose();
             cart_result_.current_pose_gripper_right = current_gripper_stamped_pose_right_;
-            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
             cart_move_as_.setSucceeded(cart_result_);            
            break;
         //prepares a trajectory plan to move arm from current pose to pre-defined pose
@@ -289,7 +289,7 @@ void ArmMotionInterface::executeCB(const actionlib::SimpleActionServer<cwru_acti
             njnts = goal->q_goal_right.size();
             if (njnts!=7) {
                 ROS_WARN("joint-space goal is wrong dimension");
-                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
             }
             else {
                 for (int i=0;i<7;i++) q_goal_pose_Xd_[i] = goal->q_goal_right[i];
@@ -314,7 +314,7 @@ void ArmMotionInterface::executeCB(const actionlib::SimpleActionServer<cwru_acti
 
         default:
             ROS_WARN("this command mode is not defined: %d", command_mode_);
-            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::COMMAND_CODE_NOT_RECOGNIZED;
+            cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::COMMAND_CODE_NOT_RECOGNIZED;
             cart_move_as_.setAborted(cart_result_); // tell the client we have given up on this goal; send the result message as well
     }
 }
@@ -515,7 +515,7 @@ void ArmMotionInterface::compute_right_tool_stamped_pose(void) {
 
 void ArmMotionInterface::execute_planned_move(void) {
                if (!path_is_valid_) {
-                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
                 ROS_WARN("attempted to execute invalid path!");
                 cart_move_as_.setAborted(cart_result_); // tell the client we have given up on this goal; send the result message as well
             }
@@ -533,11 +533,11 @@ void ArmMotionInterface::execute_planned_move(void) {
 
             if (!finished_before_timeout_) {
                 ROS_WARN("EXECUTE_PLANNED_PATH: giving up waiting on result");
-                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;
+                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;
                 cart_move_as_.setSucceeded(cart_result_); //could say "aborted"
             } else {
                 ROS_INFO("finished before timeout");
-                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+                cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
                 cart_move_as_.setSucceeded(cart_result_);
             }
             path_is_valid_ = false; // reset--require new path before next move
@@ -578,12 +578,12 @@ bool ArmMotionInterface::plan_jspace_path_qstart_to_qend(Vectorq7x1 q_start, Vec
    if (path_is_valid_) {
         baxter_traj_streamer_.stuff_trajectory(optimal_path_, des_trajectory_); //convert from vector of poses to trajectory message   
         computed_arrival_time_ = des_trajectory_.points.back().time_from_start.toSec();
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
         cart_result_.computed_arrival_time = computed_arrival_time_;
         cart_move_as_.setSucceeded(cart_result_); 
     }
     else {
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
         cart_result_.computed_arrival_time = -1.0; //impossible arrival time        
         cart_move_as_.setSucceeded(cart_result_); //the communication was a success, but not the computation 
     }             
@@ -601,12 +601,12 @@ bool ArmMotionInterface::plan_jspace_path_qstart_to_qend(Eigen::VectorXd q_start
     if (path_is_valid_) {
         baxter_traj_streamer_.stuff_trajectory(optimal_path_, des_trajectory_); //convert from vector of poses to trajectory message   
         computed_arrival_time_ = des_trajectory_.points.back().time_from_start.toSec();
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
         cart_result_.computed_arrival_time = computed_arrival_time_;
         cart_move_as_.setSucceeded(cart_result_); 
     }
     else {
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
         cart_result_.computed_arrival_time = -1.0; //impossible arrival time        
         cart_move_as_.setSucceeded(cart_result_); //the communication was a success, but not the computation 
     }   
@@ -636,12 +636,12 @@ bool ArmMotionInterface::rt_arm_plan_path_current_to_goal_pose() {
     if (path_is_valid_) {
         baxter_traj_streamer_.stuff_trajectory(optimal_path_, des_trajectory_); //convert from vector of poses to trajectory message   
         computed_arrival_time_ = des_trajectory_.points.back().time_from_start.toSec();
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
         cart_result_.computed_arrival_time = computed_arrival_time_;
         cart_move_as_.setSucceeded(cart_result_); 
     }
     else {
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
         cart_result_.computed_arrival_time = -1.0; //impossible arrival time        
         cart_move_as_.setSucceeded(cart_result_); //the communication was a success, but not the computation 
     }   
@@ -657,7 +657,7 @@ bool ArmMotionInterface::rt_arm_plan_path_current_to_goal_dp_xyz() {
     int ndim = cart_goal_.arm_dp_right.size();
     if (ndim!=3) {            
       ROS_WARN("requested displacement, arm_dp_right, is wrong dimension");
-      cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+      cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
       path_is_valid_=false;
       return path_is_valid_;    
     }
@@ -670,12 +670,12 @@ bool ArmMotionInterface::rt_arm_plan_path_current_to_goal_dp_xyz() {
     if (path_is_valid_) {
         baxter_traj_streamer_.stuff_trajectory(optimal_path_, des_trajectory_); //convert from vector of poses to trajectory message   
         computed_arrival_time_ = des_trajectory_.points.back().time_from_start.toSec();
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::SUCCESS;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::SUCCESS;
         cart_result_.computed_arrival_time = computed_arrival_time_;
         cart_move_as_.setSucceeded(cart_result_); 
     }
     else {
-        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+        cart_result_.return_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
         cart_result_.computed_arrival_time = -1.0; //impossible arrival time        
         cart_move_as_.setSucceeded(cart_result_); //the communication was a success, but not the computation 
     }   
@@ -694,7 +694,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     //if busy, refuse new requests;
     if (busy_working_on_a_request_ || received_new_request_) {
         response.bool_resp = false; // dummy; //working_on_trajectory; // return status of "working on trajectory"
-        response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::ARM_REQUEST_REJECTED_ALREADY_BUSY;
+        response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::ARM_REQUEST_REJECTED_ALREADY_BUSY;
         return false; //redundant way to s            busy_working_on_a_request_ = false;ay request was rejected      
     }
 
@@ -702,9 +702,9 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     if (request.cmd_mode == cwru_action::cwru_baxter_cart_moveGoal::ARM_IS_SERVER_BUSY_QUERY) {
         ROS_INFO("rcvd request for query--IS_SERVER_BUSY_QUERY");
         if (busy_working_on_a_request_) {
-            response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::ARM_SERVER_IS_BUSY;
+            response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::ARM_SERVER_IS_BUSY;
         } else {
-            response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::ARM_SERVER_NOT_BUSY;
+            response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::ARM_SERVER_NOT_BUSY;
         }
         return true;
     }
@@ -712,10 +712,10 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     if (request.cmd_mode == cwru_action::cwru_baxter_cart_moveGoal::ARM_QUERY_IS_PATH_VALID) {
         ROS_INFO("rcvd request for query--ARM_QUERY_IS_PATH_VALID");
         if (path_is_valid_) {
-            response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_IS_VALID;
+            response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_IS_VALID;
             return true;
         } else {
-            response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID;
+            response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID;
             return false; //hmm--don't want to confuse valid transaction w/ status?
         }
     }
@@ -725,7 +725,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
         ROS_INFO("rcvd request for query--GET_Q_DATA");
         pack_qstart(response);
         pack_qend(response);
-        response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::ARM_RECEIVED_AND_COMPLETED_RQST;
+        response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::ARM_RECEIVED_AND_COMPLETED_RQST;
         return true;
     }
 
@@ -745,7 +745,7 @@ bool ArmMotionInterface::cartMoveSvcCB(cwru_srv::arm_nav_service_messageRequest&
     plan_id_rqst_ = request.plan_id;
      */
     response.bool_resp = true; // dummy; //working_on_trajectory; // return status of "working on trajectory"
-    response.rtn_code = cwru_action::cwru_baxter_cart_moveGoal::ARM_RECEIVED_AND_INITIATED_RQST;
+    response.rtn_code = cwru_action::cwru_baxter_cart_moveResult::ARM_RECEIVED_AND_INITIATED_RQST;
     return true;
 }
 

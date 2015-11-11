@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
                 rtn_val=arm_motion_commander.rt_arm_execute_planned_path();
             }
             else {
-                ROS_WARN("Cartesiaon path to desired pose not achievable");
+                ROS_WARN("Cartesian path to desired pose not achievable");
             }
         }
         ros::Duration(0.5).sleep(); // sleep for half a second

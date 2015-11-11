@@ -143,15 +143,15 @@ int ArmMotionCommander::plan_move_to_pre_pose(void) {
     ROS_INFO("return code: %d",cart_result_.return_code);
     if (!finished_before_timeout_) {
             ROS_WARN("giving up waiting on result");
-            return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;
+            return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;
         } 
     
     ROS_INFO("finished before timeout");
-    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID) {
+    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID) {
         ROS_WARN("right arm plan not valid");
         return (int) cart_result_.return_code;
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("unknown return code... not SUCCESS");
         return (int) cart_result_.return_code;            
     }   
@@ -173,15 +173,15 @@ int ArmMotionCommander::rt_arm_plan_jspace_path_current_to_qgoal(Eigen::VectorXd
     ROS_INFO("return code: %d",cart_result_.return_code);
     if (!finished_before_timeout_) {
             ROS_WARN("giving up waiting on result");
-            return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;
+            return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;
         } 
     
     ROS_INFO("finished before timeout");
-    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID) {
+    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID) {
         ROS_WARN("right arm plan not valid");
         return (int) cart_result_.return_code;
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("unknown return code... not SUCCESS");
         return (int) cart_result_.return_code;            
     }   
@@ -204,15 +204,15 @@ int ArmMotionCommander::rt_arm_plan_path_current_to_goal_pose(geometry_msgs::Pos
     ROS_INFO("return code: %d",cart_result_.return_code);
     if (!finished_before_timeout_) {
             ROS_WARN("giving up waiting on result");
-            return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;
+            return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;
         } 
     
     ROS_INFO("finished before timeout");
-    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID) {
+    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID) {
         ROS_WARN("right arm plan not valid");
         return (int) cart_result_.return_code;
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("unknown return code... not SUCCESS");
         return (int) cart_result_.return_code;            
     }   
@@ -236,15 +236,15 @@ int ArmMotionCommander::rt_arm_plan_path_current_to_goal_dp_xyz(Eigen::Vector3d 
     ROS_INFO("return code: %d",cart_result_.return_code);
     if (!finished_before_timeout_) {
             ROS_WARN("giving up waiting on result");
-            return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;
+            return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;
         } 
     
     ROS_INFO("finished before timeout");
-    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveGoal::RT_ARM_PATH_NOT_VALID) {
+    if (cart_result_.return_code==cwru_action::cwru_baxter_cart_moveResult::RT_ARM_PATH_NOT_VALID) {
         ROS_WARN("right arm plan not valid");
         return (int) cart_result_.return_code;
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("unknown return code... not SUCCESS");
         return (int) cart_result_.return_code;            
     }   
@@ -264,9 +264,9 @@ int ArmMotionCommander::rt_arm_execute_planned_path(void) {
     finished_before_timeout_ = cart_move_action_client_.waitForResult(ros::Duration(computed_arrival_time_+2.0));
     if (!finished_before_timeout_) {
         ROS_WARN("did not complete move in expected time");
-        return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;  
+        return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;  
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("move did not return success; code = %d",cart_result_.return_code);
         return (int) cart_result_.return_code;
     }
@@ -283,9 +283,9 @@ int ArmMotionCommander::rt_arm_request_q_data(void) {
     finished_before_timeout_ = cart_move_action_client_.waitForResult(ros::Duration(computed_arrival_time_+2.0));
    if (!finished_before_timeout_) {
         ROS_WARN("did not respond within timeout");
-        return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;  
+        return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;  
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("move did not return success; code = %d",cart_result_.return_code);
         return (int) cart_result_.return_code;
     }
@@ -315,9 +315,9 @@ int ArmMotionCommander::rt_arm_request_tool_pose_wrt_torso(void) {
     finished_before_timeout_ = cart_move_action_client_.waitForResult(ros::Duration(2.0));
    if (!finished_before_timeout_) {
         ROS_WARN("did not respond within timeout");
-        return (int) cwru_action::cwru_baxter_cart_moveGoal::NOT_FINISHED_BEFORE_TIMEOUT;  
+        return (int) cwru_action::cwru_baxter_cart_moveResult::NOT_FINISHED_BEFORE_TIMEOUT;  
     }
-    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveGoal::SUCCESS) {
+    if (cart_result_.return_code!=cwru_action::cwru_baxter_cart_moveResult::SUCCESS) {
         ROS_WARN("move did not return success; code = %d",cart_result_.return_code);
         return (int) cart_result_.return_code;
     }    
@@ -389,7 +389,7 @@ int main(int argc, char** argv) {
     //try vector cartesian displacement at fixed orientation:
     dp_displacement<<0,0,-0.25;
     rtn_val = arm_motion_commander.rt_arm_plan_path_current_to_goal_dp_xyz(dp_displacement);
-    if (rtn_val == cwru_action::cwru_baxter_cart_moveGoal::SUCCESS)  { 
+    if (rtn_val == cwru_action::cwru_baxter_cart_moveResult::SUCCESS)  { 
             //send command to execute planned motion
            rtn_val=arm_motion_commander.rt_arm_execute_planned_path();
     }
