@@ -5,6 +5,8 @@
 // from IK solutions
 #include <cartesian_moves/cart_path_planner_lib.h>
 
+//choose cartesian-path sampling resolution, e.g. 5cm
+const double CARTESIAN_PATH_SAMPLE_SPACING= 0.05; // choose the resolution of samples along Cartesian path
 //constructor:
 CartTrajPlanner::CartTrajPlanner() // optionally w/ args, e.g. 
 //: as_(nh_, "CartTrajPlanner", boost::bind(&cartTrajActionServer::executeCB, this, _1), false)
@@ -49,8 +51,8 @@ bool CartTrajPlanner::cartesian_path_planner(Eigen::Affine3d a_flange_start,Eige
     p_start = a_flange_start.translation();
     p_end = a_flange_end.translation();
     del_p = p_end-p_start;
-    double dp_scaler = 0.05;
-    nsteps = round(del_p.norm()/dp_scaler);
+    double dp_scalar = CARTESIAN_PATH_SAMPLE_SPACING;
+    nsteps = round(del_p.norm()/dp_scalar);
     if (nsteps<1) nsteps=1;
     dp_vec = del_p/nsteps;
     nsteps++; //account for pose at step 0
@@ -127,8 +129,8 @@ bool CartTrajPlanner::cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d 
     cout<<"fwd kin from q_start R: "<<endl;
     cout<<a_tool_start.linear()<<endl;
     
-    a_tool_start.linear() = R_des; // override the orientation component--require point down    
-    a_tool_des.linear() = R_des;
+    a_tool_start.linear() = R_des; // no interpolation of orientation; set goal orientation immediately   
+    a_tool_des.linear() = R_des; //expected behavior: will try to achieve orientation first, before translating
 
     int nsolns;
     bool reachable_proposition;
@@ -140,8 +142,8 @@ bool CartTrajPlanner::cartesian_path_planner(Vectorq7x1 q_start,Eigen::Affine3d 
     cout<<"p_start: "<<p_start.transpose()<<endl;
     cout<<"p_end: "<<p_end.transpose()<<endl;
     cout<<"del_p: "<<del_p.transpose()<<endl;
-    double dp_scaler = 0.05;
-    nsteps = round(del_p.norm()/dp_scaler);
+    double dp_scalar = CARTESIAN_PATH_SAMPLE_SPACING;
+    nsteps = round(del_p.norm()/dp_scalar);
     if (nsteps<1) nsteps=1;
     dp_vec = del_p/nsteps;
     cout<<"dp_vec for nsteps = "<<nsteps<<" is: "<<dp_vec.transpose()<<endl;
@@ -246,8 +248,8 @@ bool CartTrajPlanner::cartesian_path_planner_delta_p(Vectorq7x1 q_start, Eigen::
     cout<<"p_start: "<<p_start.transpose()<<endl;
     cout<<"p_end: "<<p_end.transpose()<<endl;
     cout<<"del_p: "<<del_p.transpose()<<endl;
-    double dp_scaler = 0.05;
-    nsteps = round(del_p.norm()/dp_scaler);
+    double dp_scalar = 0.05;
+    nsteps = round(del_p.norm()/dp_scalar);
     if (nsteps<1) nsteps=1;
     dp_vec = del_p/nsteps;
     cout<<"dp_vec for nsteps = "<<nsteps<<" is: "<<dp_vec.transpose()<<endl;
@@ -347,8 +349,8 @@ bool CartTrajPlanner::cartesian_path_planner_wrist(Vectorq7x1 q_start,Eigen::Aff
     cout<<"p_start: "<<p_start.transpose()<<endl;
     cout<<"p_end: "<<p_end.transpose()<<endl;
     cout<<"del_p: "<<del_p.transpose()<<endl;
-    double dp_scaler = 0.05;
-    nsteps = round(del_p.norm()/dp_scaler);
+    double dp_scalar = CARTESIAN_PATH_SAMPLE_SPACING;
+    nsteps = round(del_p.norm()/dp_scalar);
     if (nsteps<1) nsteps=1;
     dp_vec = del_p/nsteps;
     cout<<"dp_vec for nsteps = "<<nsteps<<" is: "<<dp_vec.transpose()<<endl;
