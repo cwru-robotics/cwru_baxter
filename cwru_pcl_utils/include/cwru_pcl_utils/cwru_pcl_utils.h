@@ -93,6 +93,9 @@ public:
     void get_gen_purpose_cloud(pcl::PointCloud<pcl::PointXYZ> & outputCloud );    
     void example_pcl_operation();
     
+    Eigen::Vector3f get_centroid() { return centroid_; };
+    Eigen::Vector3f get_major_axis() { return major_axis_; };
+    
 private:
     ros::NodeHandle nh_; 
     // some objects to support subscriber, service, and publisher
@@ -120,7 +123,9 @@ private:
     //void initializeServices();
     
     void kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); //prototype for callback fnc
-    void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); // callback for selected points    
+    void selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud); // callback for selected points  
+    
+    Eigen::Vector3f major_axis_,centroid_; 
     //prototype for example service
     //bool serviceCallback(example_srv::simple_bool_service_messageRequest& request, example_srv::simple_bool_service_messageResponse& response);
 
