@@ -31,7 +31,7 @@ Watch out for the following; kinect transform is different for Gazebo vs real Ba
 
 *OR: after starting and enabling the robot, run the following launch file:
 
-`roslaunch example_sensor_guided_motion  baxter_sensor_guided_motion.launch'
+`roslaunch example_sensor_guided_motion  baxter_sensor_guided_motion.launch`
 
 ## Running tests/demos
     
