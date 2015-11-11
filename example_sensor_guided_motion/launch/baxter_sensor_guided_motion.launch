@@ -1,0 +1,35 @@
+<launch>
+<!-- assume either baxter_gazebo or real baxter is running  /-->
+<!-- in either case, the robot model should be loaded on the parameter server before this launch file is run -->
+
+<!-- launch these, as per README -->
+<!--if simulation, do:
+ roslaunch cwru_baxter_sim baxter_world.launch
+  (or start real robot)-->
+  <!--wait for simulator or robot to come up-->
+<!--if real robot, also need to run "baxter_master" to set remote roscore host -->
+
+<!-- enable the robot for motion commands, using: -->
+<!--rosrun baxter_tools enable_robot.py -e -->
+
+<!-- after robot is running and enabled, start up these nodes -->
+<!-- tool transform publisher -->
+<include file ="$(find cwru_baxter_launch)/yale_gripper_xform.launch"/>
+
+<!--careful; need to use the right Kinect transform for real vs simulated robot -->
+<!-- the following is for the simulated robot -->
+<include file ="$(find cwru_baxter_sim)/kinect_xform.launch"/>
+
+<!-- trajectory interpolator action server: -->
+<node pkg="baxter_traj_streamer" type="traj_interpolator_as" name="traj_interpolator_as"/>
+
+<!-- Cartesian motion action server -->
+<node pkg="baxter_cartesian_moves" type="baxter_cart_move_as" name="baxter_cart_move_as"/>
+
+<!-- rviz -->
+<node pkg="rviz" type="rviz" name="rviz"/>
+
+<!--the example sensor-guided motion node -->
+<node pkg="example_sensor_guided_motion" type="example_sensor_guided_motion_client" name="example_sensor_guided_motion_client"/>
+
+</launch>
