@@ -11,9 +11,9 @@ By selecting points in Rviz, via the "publish selected points" tool, a coordinat
 
 * wait for the robot (or Gazebo) to finish coming up; then enable the robot with:
 
-`rosrun baxter_tools enable_robot.py -e` 
+* start up the action servers and transform publishers with the following commands in separate terminals
 
-* start up the action servers and transform publishers with the following 6 commands in separate terminals
+`rosrun baxter_tools enable_robot.py -e` 
 
 `rosrun baxter_traj_streamer  traj_interpolator_as`
 
@@ -29,9 +29,9 @@ Watch out for the following; kinect transform is different for Gazebo vs real Ba
 
 `rosrun example_sensor_guided_motion example_sensor_guided_motion_client`
 
-*OR: after starting and enabling the robot, run the following launch file:
+*OR: use the handy launch file.  After starting the robot, run the following launch file:
 
 `roslaunch example_sensor_guided_motion  baxter_sensor_guided_motion.launch`
 
-## Running tests/demos
+
     
