@@ -7,7 +7,10 @@
 CwruPclUtils::CwruPclUtils(ros::NodeHandle* nodehandle) : nh_(*nodehandle), pclKinect_ptr_(new PointCloud<pcl::PointXYZ>),
         pclKinect_clr_ptr_(new PointCloud<pcl::PointXYZRGB>),
 pclTransformed_ptr_(new PointCloud<pcl::PointXYZ>), pclSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),
+        pclSelectedPtsClr_ptr_(new PointCloud<pcl::PointXYZRGB>),
 pclTransformedSelectedPoints_ptr_(new PointCloud<pcl::PointXYZ>),pclGenPurposeCloud_ptr_(new PointCloud<pcl::PointXYZ>) {
+
+    
     initializeSubscribers();
     initializePublishers();
     got_kinect_cloud_ = false;
@@ -256,6 +259,10 @@ void CwruPclUtils::get_gen_purpose_cloud(pcl::PointCloud<pcl::PointXYZ> & output
     }    
 } 
 
+//void CwruPclUtils::get_indices(vector<int> &indices,) {
+//    indices = indicies_;
+//}
+
 //here is an example utility function.  It operates on clouds that are member variables, and it puts its result
 // in the general-purpose cloud variable, which can be acquired by main(), if desired, using get_gen_purpose_cloud()
 
@@ -271,6 +278,196 @@ void CwruPclUtils::example_pcl_operation() {
     }    
 } 
 
+//This fnc populates and output cloud of type XYZRGB extracted from the full Kinect cloud (in Kinect frame)
+// provide a vector of indices and a holder for the output cloud, which gets populated
+void CwruPclUtils::copy_indexed_pts_to_output_cloud(vector<int> &indices,PointCloud<pcl::PointXYZRGB> &outputCloud) {
+    int npts = indices.size(); //how many points to extract?
+    outputCloud.header = pclKinect_clr_ptr_->header;
+    outputCloud.is_dense = pclKinect_clr_ptr_->is_dense;
+    outputCloud.width = npts;
+    outputCloud.height = 1;
+    int i_index;
+
+    cout << "copying cloud w/ npts =" << npts << endl;
+    outputCloud.points.resize(npts);
+    for (int i = 0; i < npts; ++i) {
+        i_index = indices[i];
+        outputCloud.points[i].getVector3fMap() = pclKinect_clr_ptr_->points[i_index].getVector3fMap();
+        outputCloud.points[i].r = pclKinect_clr_ptr_->points[i_index].r;
+        outputCloud.points[i].g = pclKinect_clr_ptr_->points[i_index].g;
+        outputCloud.points[i].b = pclKinect_clr_ptr_->points[i_index].b;
+        /*
+            std::cout <<i_index
+              << "    " << (int) pclKinect_clr_ptr_->points[i_index].r
+              << " "    << (int) pclKinect_clr_ptr_->points[i_index].g
+              << " "    << (int) pclKinect_clr_ptr_->points[i_index].b << std::endl;
+         */
+    }
+} 
+
+
+// comb through kinect colors and compute average color
+// disregard color=0,0,0 
+Eigen::Vector3d CwruPclUtils::find_avg_color() {
+    Eigen::Vector3d avg_color;
+    Eigen::Vector3d pt_color;
+    Eigen::Vector3d ref_color;
+    indices_.clear();
+    ref_color<<147,147,147;
+    int npts = pclKinect_clr_ptr_->points.size();
+    int npts_colored = 0;
+    for (int i=0;i<npts;i++) {
+        pt_color(0) = (double) pclKinect_clr_ptr_->points[i].r;
+        pt_color(1) = (double) pclKinect_clr_ptr_->points[i].g;
+        pt_color(2) = (double) pclKinect_clr_ptr_->points[i].b;
+
+    if ((pt_color-ref_color).norm() > 1) {
+        avg_color+= pt_color;
+        npts_colored++;
+        indices_.push_back(i); // save this points as "interesting" color
+    }
+    }
+    ROS_INFO("found %d points with interesting color",npts_colored);
+    avg_color/=npts_colored;
+    ROS_INFO("avg interesting color = %f, %f, %f",avg_color(0),avg_color(1),avg_color(2));
+    return avg_color;
+ 
+}
+
+Eigen::Vector3d CwruPclUtils::find_avg_color_selected_pts(vector<int> &indices) {
+    Eigen::Vector3d avg_color;
+    Eigen::Vector3d pt_color;
+    //Eigen::Vector3d ref_color;
+
+    int npts = indices.size();
+    int index;
+
+    for (int i=0;i<npts;i++) {
+        index = indices[i];
+        pt_color(0) = (double) pclKinect_clr_ptr_->points[index].r;
+        pt_color(1) = (double) pclKinect_clr_ptr_->points[index].g;
+        pt_color(2) = (double) pclKinect_clr_ptr_->points[index].b;
+        avg_color+= pt_color;
+    }
+    avg_color/=npts;
+    ROS_INFO("avg color = %f, %f, %f",avg_color(0),avg_color(1),avg_color(2));
+    return avg_color;
+}
+
+void CwruPclUtils::find_indices_color_match(vector<int> &input_indices,
+                    Eigen::Vector3d normalized_avg_color,
+                    double color_match_thresh, vector<int> &output_indices) {
+     Eigen::Vector3d pt_color;
+
+    int npts = input_indices.size();
+    output_indices.clear();
+    int index;
+    int npts_matching = 0;
+
+    for (int i=0;i<npts;i++) {
+        index = input_indices[i];
+        pt_color(0) = (double) pclKinect_clr_ptr_->points[index].r;
+        pt_color(1) = (double) pclKinect_clr_ptr_->points[index].g;
+        pt_color(2) = (double) pclKinect_clr_ptr_->points[index].b;
+        pt_color = pt_color/pt_color.norm(); //compute normalized color
+        if ((normalized_avg_color-pt_color).norm()<color_match_thresh) {
+            output_indices.push_back(index);  //color match, so save this point index
+            npts_matching++;
+        }
+    }   
+    ROS_INFO("found %d color-match points from indexed set",npts_matching);
+    
+} 
+
+//special case of above for transformed Kinect pointcloud:
+void CwruPclUtils::filter_cloud_z(double z_nom, double z_eps, 
+                double radius, Eigen::Vector3f centroid, vector<int> &indices) {
+   filter_cloud_z(pclTransformed_ptr_, z_nom, z_eps, radius, centroid,indices);      
+}
+
+//operate on transformed Kinect pointcloud:
+void CwruPclUtils::find_coplanar_pts_z_height(double plane_height,double z_eps,vector<int> &indices) {
+    filter_cloud_z(pclTransformed_ptr_,plane_height,z_eps,indices);
+}
+
+void CwruPclUtils::filter_cloud_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, double z_nom, double z_eps, vector<int> &indices) {
+    int npts = inputCloud->points.size();
+    Eigen::Vector3f pt;
+    indices.clear();
+    double dz;
+    int ans;
+    for (int i = 0; i < npts; ++i) {
+        pt = inputCloud->points[i].getVector3fMap();
+        //cout<<"pt: "<<pt.transpose()<<endl;
+        dz = pt[2] - z_nom;
+        if (fabs(dz) < z_eps) {
+            indices.push_back(i);
+            //cout<<"dz = "<<dz<<"; saving this point...enter 1 to continue: ";
+            //cin>>ans;
+        }
+    }
+    int n_extracted = indices.size();
+    cout << " number of points in range = " << n_extracted << endl;
+}
+
+//find points that are both (approx) coplanar at height z_nom AND within "radius" of "centroid"
+void CwruPclUtils::filter_cloud_z(PointCloud<pcl::PointXYZ>::Ptr inputCloud, double z_nom, double z_eps, 
+                double radius, Eigen::Vector3f centroid, vector<int> &indices)  {
+    int npts = inputCloud->points.size();
+    Eigen::Vector3f pt;
+    indices.clear();
+    double dz;
+    int ans;
+    for (int i = 0; i < npts; ++i) {
+        pt = inputCloud->points[i].getVector3fMap();
+        //cout<<"pt: "<<pt.transpose()<<endl;
+        dz = pt[2] - z_nom;
+        if (fabs(dz) < z_eps) {
+            //passed z-test; do radius test:
+            if ((pt-centroid).norm()<radius) {
+               indices.push_back(i);
+            }
+            //cout<<"dz = "<<dz<<"; saving this point...enter 1 to continue: ";
+            //cin>>ans;
+        }
+    }
+    int n_extracted = indices.size();
+    cout << " number of points in range = " << n_extracted << endl;    
+    
+}
+    
+
+void CwruPclUtils::analyze_selected_points_color() {
+    int npts = pclTransformedSelectedPoints_ptr_->points.size(); //number of points
+    //copy_cloud(pclTransformedSelectedPoints_ptr_,pclGenPurposeCloud_ptr_); //now have a copy of the selected points in gen-purpose object
+    //Eigen::Vector3f offset;
+    //offset<<0,0,0.05;
+    int npts_clr = pclSelectedPtsClr_ptr_->points.size();
+    cout<<"color pts size = "<<npts_clr<<endl;
+        pcl::PointXYZRGB p;
+        // unpack rgb into r/g/b
+        uint32_t rgb = *reinterpret_cast<int*>(&p.rgb);
+        uint8_t r,g,b;
+        int r_int;
+    
+    for (int i = 0; i < npts; ++i) {
+        p = pclSelectedPtsClr_ptr_->points[i];
+        r = (rgb >> 16) & 0x0000ff;
+        r_int = (int) r;
+        // g = (rgb >> 8)  & 0x0000ff;
+        // b = (rgb)       & 0x0000ff;
+        cout<<"r_int: "<<r_int<<endl;
+        cout<<"r1: "<<r<<endl;
+        r=pclSelectedPtsClr_ptr_->points[i].r;
+        cout<<"r2 = "<<r<<endl;
+ 
+        //cout<<" ipt, r,g,b = "<<i<<","<<pclSelectedPtsClr_ptr_->points[i].r<<", "<<
+        //        pclSelectedPtsClr_ptr_->points[i].g<<", "<<pclSelectedPtsClr_ptr_->points[i].b<<endl;
+        //pclGenPurposeCloud_ptr_->points[i].getVector3fMap() = pclGenPurposeCloud_ptr_->points[i].getVector3fMap()+offset;   
+    }    
+        cout<<"done combing through selected pts"<<endl;
+        got_kinect_cloud_=false; // get a new snapshot
+} 
 
 //generic function to copy an input cloud to an output cloud
 // provide pointers to the two clouds
@@ -288,6 +485,23 @@ void CwruPclUtils::copy_cloud(PointCloud<pcl::PointXYZ>::Ptr inputCloud, PointCl
         outputCloud->points[i].getVector3fMap() = inputCloud->points[i].getVector3fMap();
     }
 }
+
+//given indices of interest, chosen points from input colored cloud to output colored cloud
+void CwruPclUtils::copy_cloud_xyzrgb_indices(PointCloud<pcl::PointXYZRGB>::Ptr inputCloud, vector<int> &indices, PointCloud<pcl::PointXYZRGB>::Ptr outputCloud) {
+    int npts = indices.size(); //how many points to extract?
+    outputCloud->header = inputCloud->header;
+    outputCloud->is_dense = inputCloud->is_dense;
+    outputCloud->width = npts;
+    outputCloud->height = 1;
+
+    cout << "copying cloud w/ npts =" << npts << endl;
+    outputCloud->points.resize(npts);
+    for (int i = 0; i < npts; ++i) {
+        outputCloud->points[i].getVector3fMap() = inputCloud->points[indices[i]].getVector3fMap();
+    }
+}
+
+
 
 //need to fix this to put proper frame_id in header
 
@@ -342,7 +556,24 @@ void CwruPclUtils::kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
         pcl::fromROSMsg(*cloud, *pclKinect_ptr_);
         pcl::fromROSMsg(*cloud,*pclKinect_clr_ptr_);
         ROS_INFO("kinectCB: got cloud with %d * %d points", (int) pclKinect_ptr_->width, (int) pclKinect_ptr_->height);
-        got_kinect_cloud_ = true; //cue to "main" that callback received and saved a pointcloud        
+        got_kinect_cloud_ = true; //cue to "main" that callback received and saved a pointcloud 
+        //check some colors:
+   int npts_clr = pclKinect_clr_ptr_->points.size();
+    cout<<"Kinect color pts size = "<<npts_clr<<endl;
+    avg_color_ = find_avg_color();
+    /*
+     for (size_t i = 0; i < pclKinect_clr_ptr_->points.size (); ++i)
+     std::cout << " " << (int) pclKinect_clr_ptr_->points[i].r
+              << " "    << (int) pclKinect_clr_ptr_->points[i].g
+              << " "    << (int) pclKinect_clr_ptr_->points[i].b << std::endl;   
+
+ 
+        //cout<<" ipt, r,g,b = "<<i<<","<<pclSelectedPtsClr_ptr_->points[i].r<<", "<<
+        //        pclSelectedPtsClr_ptr_->points[i].g<<", "<<pclSelectedPtsClr_ptr_->points[i].b<<endl;
+        //pclGenPurposeCloud_ptr_->points[i].getVector3fMap() = pclGenPurposeCloud_ptr_->points[i].getVector3fMap()+offset;   
+
+        cout<<"done combing through selected pts"<<endl;   
+     *     */     
     }
     //pcl::io::savePCDFileASCII ("snapshot.pcd", *g_pclKinect);
     //ROS_INFO("saved PCD image consisting of %d data points to snapshot.pcd",(int) g_pclKinect->points.size ()); 
@@ -352,6 +583,23 @@ void CwruPclUtils::kinectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
 
 void CwruPclUtils::selectCB(const sensor_msgs::PointCloud2ConstPtr& cloud) {
     pcl::fromROSMsg(*cloud, *pclSelectedPoints_ptr_);
+    
+    //looks like selected points does NOT include color of points
+    //pcl::fromROSMsg(*cloud, *pclSelectedPtsClr_ptr_); //color version  
+
     ROS_INFO("RECEIVED NEW PATCH w/  %d * %d points", pclSelectedPoints_ptr_->width, pclSelectedPoints_ptr_->height);
+ 
+    /*
+    ROS_INFO("Color version has  %d * %d points", pclSelectedPtsClr_ptr_->width, pclSelectedPtsClr_ptr_->height);
+
+    for (size_t i = 0; i < pclSelectedPtsClr_ptr_->points.size (); ++i) {
+    std::cout <<i<<": "
+              << "    " << (int) pclSelectedPtsClr_ptr_->points[i].r
+              << " "    << (int) pclSelectedPtsClr_ptr_->points[i].g
+              << " "    << (int) pclSelectedPtsClr_ptr_->points[i].b << std::endl;
+    }
+     * */
+    ROS_INFO("done w/ selected-points callback");
+
     got_selected_points_ = true;
 }

@@ -1,0 +1,30 @@
+Issues:
+
+from selected points, does:
+  fit these to a plane
+  return the plane normal, offset and centroid of patch selection
+  
+  In example code, the selected points are transformed to torso frame, so expect normal points +z
+  
+  cwru_pcl_utils_color_test.cpp:
+  
+  in loop, if get new selection of points:
+    *transform these points to torso frame
+    *fit these points to plane and return plane_normal, plane_dist and get centroid (all in torso frame)
+    
+    *use:   cwru_pcl_utils.filter_cloud_z(plane_dist, z_eps, radius,centroid,selected_indices);
+      to get INDICES of points within +/- z_eps of z=plane_dist AND within "radius" of "centroid"
+      
+      
+    *use:  cwru_pcl_utils.copy_indexed_pts_to_output_cloud(selected_indices,display_color_cloud); 
+      to create a pointcloud of type XYZRGB, selected from the original (full) Kinect XYZRGB cloud,
+      using "selecte_indices".  Note that although these indices were found based on transformed cloud,
+      they corespond to points in original cloud
+      
+    *use:  avg_color = cwru_pcl_utils.find_avg_color_selected_pts(selected_indices);
+       which consults the original Kinect cloud (in kinect frame) get get and average the color of
+       a disk of radius "radius" about the patch centroid and coplanar with the patch.
+       I.e., find to color of the patch. (Although the published selected points are colorless)
+       
+       
+
