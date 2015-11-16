@@ -1,4 +1,7 @@
 //use ROS service to move objects in Gazebo
+// put 1mm_bar at pose suitable for initial grasp
+// for rosrun playfile_reader playfile_cameraspace test_cameraspace_peg_handoff.csp
+
 #include <gazebo_msgs/ModelState.h>
 #include <geometry_msgs/Pose.h>
 #include <gazebo_msgs/SetModelState.h>
@@ -44,9 +47,9 @@ int main(int argc, char **argv) {
 
     geometry_msgs::Pose pose;
     geometry_msgs::Quaternion quat;
-    double x = -0.119; //-0.118;
-    double y = 0.021; //0.022;
-    double z = 0.87;
+    double x = -0.017; //-0.118;
+    double y = 0.016; //0.022;
+    double z = 0.74;
     double qx=0.0;
     double qy=0.0;
     double qz = 0.0;
@@ -59,9 +62,9 @@ int main(int argc, char **argv) {
      quat.z = 0.0;
      quat.w = 1.0;
      pose.orientation= quat;
-    cout<<"enter model name: ";
-    char name[32];
-    cin>>name;
+    //cout<<"enter model name: ";
+    char name[]="1mm_bar";
+    //cin>>name;
     des_model_state.model_name = name; //"checkerboard";//"wood_cube_10cm";//"beer";
     des_model_state.pose = pose;
     des_model_state.twist = twist;
