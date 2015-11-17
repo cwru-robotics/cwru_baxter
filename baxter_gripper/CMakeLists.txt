@@ -19,6 +19,7 @@ cs_add_executable(baxter_gripper src/baxter_gripper.cpp src/ReadWrite.c src/dyna
 #cs_add_executable(dynamixel_motor2_node src/dynamixel_motor2_node.cpp src/ReadWrite.c src/dynamixel.c src/dxl_hal.c)
 cs_add_executable(dynamixel_motor_node src/dynamixel_motor_node.cpp src/ReadWrite.c src/dynamixel.c src/dxl_hal.c)
 cs_add_executable(dynamixel_sin_test src/dynamixel_sin_test.cpp )
+cs_add_executable(baxter_gripper_test src/baxter_gripper_test.cpp )
 # target_link_library(example my_lib)
 
 cs_install()

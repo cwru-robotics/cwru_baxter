@@ -24,14 +24,14 @@ The command and feedback values may be plotted via rqt_plot to observer performa
 A complementary test function is: 
 `rosrun baxter_gripper dynamixel_sin_test`
 
-This will prompt for a motor_id, then send sinusoidal commands to the corresponding command topic.
+This will prompt for a motor_id, then send 1-rev peak-to-peak sinusoidal commands to the corresponding command topic.
 
 ## Example usage
 `rosrun baxter_gripper dynamixel_motor_node` (default for Baxter's right-hand Yale gripper)
-`rosrun baxter_gripper dynamixel_sin_test` (for slow, 1-rev peak-to-peak sinusoidal oscillations)
+`rosrun baxter_gripper baxter_gripper_test` (for slow, open/close motions of gripper)
 
-Alternatively, try a manual test, e.g. to command motor 1 to angle 1000:
-`rostopic pub dynamixel_motor1_cmd std_msgs/Int16 1000`
+Alternatively, try a manual test, e.g. to command motor 1 to angle 3600 (~ a good command to grasp a block):
+`rostopic pub dynamixel_motor1_cmd std_msgs/Int16 3600`
 
 
 
