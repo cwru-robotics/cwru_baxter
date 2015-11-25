@@ -1,0 +1,18 @@
+here are two models that you can use with Gazebo and ROS
+They are each rectangular blocks, described in "SDF" format.
+
+To import these models into Gazebo, you must copy these folders into your ".gazebo" directory.
+The .gazebo directory is a hidden directory directly within your home directory.  In the .gazebo directory, you should have a sub-directory called "models".  (If not, create one).
+Within this subdirectory, copy the folders "colored_block" and "colored_block 2".
+
+When you start up Gazebo, you can go to the "insert" tab, and you should see these two models show up.
+You can select a model, then position it in Gazebo (or re-position it to place it on the table).
+
+To place a block on the table, it is convenient to suspend Gazebo physics, so the block does not fall while you are moving it.  To do so, click the "pause" button on the bottom bar of the Gazebo window.  Once you have repositioned the block, you can resume Gazebo processing by clicking the "run" button.
+
+Here is an inconvenient incompatibility.  You will find that "colored_block" shows up as red in Gazebo, but shows up as blue in Rviz!  Similarly, "colored_block2" shows up as blue in Gazebo, but red in Rviz.  This is because Gazebo and Rviz use different rendering color schemes.  
+
+I have not yet resolved how to get one model to communicate proper colors to both Gazebo and Rviz.  However, you should see different colors in Rviz.  Since the kinect emulator runs in Gazebo, you may find that the Kinect color data corresponds to the Gazebo colors.
+
+I expect to eventually resolve and reconcile this, but you can work with these for now.
+
