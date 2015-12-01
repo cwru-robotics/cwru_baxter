@@ -5,6 +5,7 @@
 //##########################################################
 
 //modified by wsn, 11/15 for use w/ ROS node
+// modified by mak237, 11/23/15 to add further access to eeprom values (position min/max, torque max, etc.)
 #include <stdio.h>
 #include <termio.h>
 #include <unistd.h>
@@ -12,6 +13,20 @@
 
 
 // Control table address
+
+// mak237, added addresses for cw and ccw limits
+#define P_CW_LIMIT_L		6
+#define P_CW_LIMIT_H		7 //not needed based on how dxl_write_word handles low/high bytes
+#define P_CCW_LIMIT_L		8
+#define P_CCW_LIMIT_H		9 //not needed based on how dxl_write_word handles low/high bytes
+
+// mak237, added addresses for torque enable, setting, and limits
+#define P_TORQUE_MAX_L		14
+#define P_TORQUE_MAX_H		15
+#define P_TORQUE_ENABLE		70
+#define P_GOAL_TORQUE_L		71
+#define P_GOAL_TORQUE_H		72
+
 #define P_GOAL_POSITION_L	30
 #define P_GOAL_POSITION_H	31
 #define P_PRESENT_POSITION_L	36
@@ -48,6 +63,70 @@ int send_dynamixel_goal(short int motor_id, int goalval)
 		dxl_write_word( motor_id, P_GOAL_POSITION_L, goalval );
 	return 0;
 }
+
+
+//mak237 added cw limit function
+int set_dynamixel_CW_limit(short int motor_id, int CW_limit) 
+{
+		
+		dxl_write_word( motor_id, P_CW_LIMIT_L, CW_limit );
+ // mak237, not sure if this needs to be done as two seperate commands or just write the low with the total limit
+		/*
+		int CW_high_limit = CW_limit >> 8;
+		int CW_low_limit = CW_limit & 0xFF;
+
+		dxl_write_word( motor_id, P_CW_LIMIT_L, CW_high_limit );
+		dxl_write_word( motor_id, P_CW_LIMIT_H, CW_low_limit );
+*/
+	return 0;
+}
+
+//mak237 added ccw limit function
+int set_dynamixel_CCW_limit(short int motor_id, int CCW_limit) 
+{
+		
+		dxl_write_word( motor_id, P_CCW_LIMIT_L, CCW_limit );
+ // mak237, not sure if this needs to be done as two seperate commands or just write the low with the total limit
+		/*
+		int CCW_high_limit = CCW_limit >> 8;
+		int CW_low_limit = CCW_limit & 0xFF;
+
+		dxl_write_word( motor_id, P_CCW_LIMIT_L, CCW_high_limit );
+		dxl_write_word( motor_id, P_CCW_LIMIT_H, CCW_low_limit );
+*/
+	return 0;
+}
+
+// mak237, added torque mode switch command
+// torque_mode = 0 for joint mode, 1 for torque mode
+int torque_control_toggle(short int motor_id, int torque_mode) 
+{
+		dxl_write_byte( motor_id, P_TORQUE_ENABLE, torque_mode );
+	return 0;
+}
+
+// mak237, added set torque max
+int set_torque_max(short int motor_id, int torque_max) 
+{
+		dxl_write_word( motor_id, P_TORQUE_MAX_L, torque_max );
+	return 0;
+}
+
+// mak237, added set torque goal
+
+int send_dynamixel_torque_goal(short int motor_id, int torquegoalval) 
+{
+	if (torquegoalval <= 1023)
+	{ 
+	  dxl_write_word( motor_id, P_GOAL_TORQUE_L, torquegoalval );
+	}
+	else 
+	{
+	  dxl_write_word( motor_id, P_GOAL_TORQUE_L, 0 );
+	} 
+	return 0;
+}
+
 
 // Read present position
 short int read_position(short int motor_id) {
