@@ -68,16 +68,13 @@ int main(int argc, char **argv) {
   	if (toggle_msg.data == 1)
   	{
    	  ROS_INFO("sending close command");
-	  cmd_msg.data = 128; //setting close value (torque). This should firmly grip the larger blocks and loosely grip the smaller blocks
+	  cmd_msg.data = 80; //setting close value (torque). This should firmly grip the larger blocks and loosely grip the smaller blocks
   	}
 
 	torque_toggle.publish(toggle_msg); // publish the operation mode (position/torque) to the motor node
         dyn_pub.publish(cmd_msg); // publish the command to the motor node
 	ros::spinOnce();	
 	naptime.sleep();
-
-
-
 
 
     }

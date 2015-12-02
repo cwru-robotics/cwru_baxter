@@ -31,7 +31,7 @@
 // Dynamixel motor position/torque limit settings: 
 #define DEFAULT_CW_LIMIT	3000 // Yale hand full open
 #define DEFAULT_CCW_LIMIT	3800 // Yale hand full close (fingertips together)
-#define DEFAULT_TORQUE_LIMIT	256
+#define DEFAULT_TORQUE_LIMIT	128
 
 // add motor communication commands defined in dxl_c_files/ReadWrite.c
 extern "C" { 
