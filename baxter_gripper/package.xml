@@ -2,7 +2,7 @@
 <package>
   <name>baxter_gripper</name>
   <version>0.0.0</version>
-  <description>The baxter_gripper package</description>
+  <description>The gripper_test_pkg package</description>
   
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->

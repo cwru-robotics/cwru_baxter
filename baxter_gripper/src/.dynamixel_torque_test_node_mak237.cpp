@@ -1,7 +1,6 @@
 //wsn, 11/15; compile low-level C-code for Dynamixel communication w/ C++ ROS node
-// this node subscribes to topic "dynamixel_motor1_cmd" for position commands in the range 0-4095
-// It also publishes motor angles on topic "dynamixel_motor1_ang"
-
+// this node subscribes to topic "dynamixel_motor2_cmd" for position commands in the range 0-4095
+// It also publishes motor angles on topic "dynamixel_motor2_ang"
 // for baxter gripper, want: motor_id=1; baudnum=1; ttynum=0;
 // these are the defaults;
 // alternatively, run w/: rosrun baxter_gripper dynamixel_motor_node -m 2 -tty 0 -baudnum 1
@@ -9,39 +8,47 @@
 // rosrun baxter_gripper dynamixel_motor_node -m 2
 
 // this node's name and its topic names are mangled to match motor_id, e.g.
-//  dynamixel_motor1_cmd for motor 1, and dynamixel_motor1_ang for motor1 feedback topic
+//  dynamixel_motor2_cmd for motor 2, and dynamixel_motor2_ang for motor2 feedback topic
 //  NOTE: there are fairly frequent read errors from the motor;  
 //  read errors are published as ang+4096;  inspect the angle value, and if >4096, DO NOT BELIEVE IT
 
-// can test this node with "rosrun baxter_gripper baxter_gripper_test", which will prompt for the motor_id,
+// can test this node with "rosrun baxter_gripper dynamixel_sin_test", which will prompt for the motor_id,
 // then command slow sinusoides on the chosen motor topic
 
 
 #include<ros/ros.h> 
 #include<std_msgs/Int16.h> 
-#include<std_msgs/Bool.h> 
 #include <linux/serial.h>
 #include <termios.h>
 
 // Default settings: EDIT THESE FOR YOUR MOTOR
 #define DEFAULT_BAUDNUM		1 // code "1" --> 1Mbps
-#define DEFAULT_ID		1 //this is the motor ID
+#define DEFAULT_ID		2 //this is the motor ID
 #define DEFAULT_TTY_NUM			0 // typically, 0 for /dev/ttyUSB0
-
-// Dynamixel motor position/torque limit settings: 
-#define DEFAULT_CW_LIMIT	3000 // Yale hand full open
-#define DEFAULT_CCW_LIMIT	3800 // Yale hand full close (fingertips together)
+// mak237, added predefined motor positions for yale hand min/max
+#define DEFAULT_CW_LIMIT	3000
+#define DEFAULT_CCW_LIMIT	3800
+// mak237, added torque max value definition
 #define DEFAULT_TORQUE_LIMIT	128
 
-// add motor communication commands defined in dxl_c_files/ReadWrite.c
+
 extern "C" { 
   int send_dynamixel_goal(short int motor_id, short int goalval); 
   int open_dxl(int deviceIndex, int baudnum);
+// mak237, added CW and CCW position limit functions
   int set_dynamixel_CW_limit(short int motor_id, int CW_limit);
   int set_dynamixel_CCW_limit(short int motor_id, int CCW_limit);
-  int torque_control_toggle(short int motor_id, int torque_mode);
+
+// mak237, added torque limit function
   int set_torque_max(short int motor_id, int torque_max);
+
+// mak237, added torque mode toggle function
+  int torque_control_toggle(short int motor_id, int torque_mode);
+
+// mak237, added torque command function
+
   int send_dynamixel_torque_goal(short int motor_id, int torquegoalval);
+
 
   //make these global, so connection info is not lost after fnc call
   char	gDeviceName[20];
@@ -56,48 +63,21 @@ extern "C" {
   short int motor_id = DEFAULT_ID;
   short int baudnum = DEFAULT_BAUDNUM;
   int ttynum = DEFAULT_TTY_NUM;
-  short int g_goal_cmd=0;
-
+  short int g_goal_torque=0;
+// mak237, added variables for cw and ccw limits
   int CW_limit = DEFAULT_CW_LIMIT;
   int CCW_limit = DEFAULT_CCW_LIMIT;
+
+// mak237, added variable for torque limit
   int torque_max = DEFAULT_TORQUE_LIMIT;
 
-  bool torque_mode = 0;
-  bool torque_mode_old = 0; 
 
-// Callback to toggle between position and torque modes
-void toggleCB(const std_msgs::Bool& torque_toggle_msg)
-{
-  torque_mode = torque_toggle_msg.data; // pull incoming torque mode
-  if (torque_mode != torque_mode_old) // if torque mode has changed send a command to change toggle status to motor
-  {
-     torque_control_toggle(motor_id, torque_mode);
-  }
-  torque_mode_old = torque_mode; // remember most recent torque mode
-
-}
-
-// Callback to receive goal commands and send them to the motor
-void dynamixelCB(const std_msgs::Int16& goal_cmd_msg) 
+void dynamixelCB(const std_msgs::Int16& goal_torque_msg) 
 { 
-  short int goal_cmd = goal_cmd_msg.data;
-
-  if (torque_mode == torque_mode_old) //if not in the middle of a togle state send current goal message
-  {
-     g_goal_cmd = goal_cmd; // for use by main()
-
-     if (torque_mode == 0)
-     {
-	send_dynamixel_goal(motor_id,goal_cmd);
-     }
-     else if (torque_mode == 1)
-     {
-	send_dynamixel_torque_goal(motor_id, goal_cmd);
-     }
-  }
-
+  short int goal_torque = goal_torque_msg.data;
+  g_goal_torque = goal_torque; // for use by main()
+     send_dynamixel_torque_goal(motor_id,goal_torque);
 } 
-
 
 
 int main(int argc, char **argv) 
@@ -140,14 +120,10 @@ int main(int argc, char **argv)
   char out_topic_name[50];
   sprintf(node_name,"dynamixel_motor%d",motor_id);
   ROS_INFO("node name: %s",node_name);
-  sprintf(in_topic_name,"dynamixel_motor%d_cmd",motor_id);
+  sprintf(in_topic_name,"dynamixel_motor%d_torque_cmd",motor_id);
   ROS_INFO("input command topic: %s",in_topic_name);
-  sprintf(out_topic_name,"dynamixel_motor%d_ang",motor_id);
+  sprintf(out_topic_name,"dynamixel_motor%d_torque",motor_id);
   ROS_INFO("output topic: %s",out_topic_name);
-
-  char in_topic_toggle[50];
-  sprintf(in_topic_toggle,"dynamixel_motor%d_mode",motor_id);
-
 
   ros::init(argc,argv,node_name); //name this node 
 
@@ -167,22 +143,21 @@ int main(int argc, char **argv)
   ROS_INFO("attempting communication with motor_id %d at baudrate code %d",motor_id,baudnum);
 
   ros::Subscriber subscriber = n.subscribe(in_topic_name,1,dynamixelCB); 
-  ros::Subscriber toggle_subscriber = n.subscribe(in_topic_toggle,1,toggleCB); 
   std_msgs::Int16 motor_ang_msg;
   short int sensed_motor_ang=0;
 
-  torque_control_toggle(motor_id,0); // set motor to torque mode during initialization
+// mak237, added torque mode nablee for initialization of torque mode
+  torque_control_toggle(motor_id,1);
 
-  // set position/torque limits during initialization
+// mak237, added motor torque limit initialization
   set_torque_max(motor_id,torque_max);
-  set_dynamixel_CW_limit(motor_id,CW_limit);
-  set_dynamixel_CCW_limit(motor_id,CCW_limit);
+
 
 
   while(ros::ok()) {
    sensed_motor_ang = read_position(motor_id);
    if (sensed_motor_ang>4096) {
-      ROS_WARN("read error from Dynamixel: ang value %d at cmd %d",sensed_motor_ang-4096,g_goal_cmd);
+//      ROS_WARN("read error from Dynamixel: ang value %d at cmd %d",sensed_motor_ang-4096,g_goal_angle);
     }
     motor_ang_msg.data = sensed_motor_ang;
    pub_jnt.publish(motor_ang_msg);

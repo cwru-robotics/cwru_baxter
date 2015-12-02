@@ -34,7 +34,23 @@ Alternatively, try a manual test, e.g. to command motor 1 to angle 3600 (~ a goo
 `rostopic pub dynamixel_motor1_cmd std_msgs/Int16 3600`
 
 
+## Additions and changes
+
+The baxter_compliant_gripper node looks for a boolean input and then commands the dynamixel_motor_node to either full open (position 3000) or to apply a torque to close (torque 128)
+
+
+To operate run the two following commands:
+
+rosrun baxter_gripper dynamixel_motor_node
+
+rosrun baxter_gripper baxter_compliant_gripper
 
 
 
-    
+To manually command the gripper to open or close use the following commands:
+
+rostopic pub gripper_cmd std_msgs/Bool 0
+
+rostopic pub gripper_cmd std_msgs/Bool 1
+
+
