@@ -74,7 +74,7 @@ include_directories(
 
 add_executable(traj_interpolator_as src/traj_interpolator_as.cpp)
 add_executable(traj_action_client_pre_pose src/traj_action_client_pre_pose.cpp)
-
+add_executable(get_and_save_r_arm_pose src/get_and_save_r_arm_pose.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 #add_dependencies(traj_action_client_pre_pose)
@@ -94,6 +94,7 @@ add_dependencies(traj_interpolator_as baxter_traj_streamer_generate_messages_cpp
 
 target_link_libraries(traj_interpolator_as baxter_traj_streamer  ${catkin_LIBRARIES})
 target_link_libraries(traj_action_client_pre_pose baxter_traj_streamer ${catkin_LIBRARIES})
+target_link_libraries(get_and_save_r_arm_pose baxter_traj_streamer  ${catkin_LIBRARIES})
 
 add_dependencies(baxter_traj_streamer baxter_core_msgs_gencpp)
 
