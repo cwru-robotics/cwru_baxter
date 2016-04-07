@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh; // create a node handle; need to pass this to the class constructor
     //instantiate a DavinciJointPublisher object and pass in pointer to nodehandle for constructor to use
 
-    ros::Subscriber traj_code = nh.subscribe("alexa_codes", 1, alexaCB);
+    ros::Subscriber traj_code = nh.subscribe("/Alexa_codes", 1, alexaCB);
     int g_count = 0;
     int ans;
     Vectorq7x1 q_pre_pose;
