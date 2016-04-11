@@ -266,18 +266,43 @@ int main(int argc, char** argv) {
         if (g_got_code_trigger) {
             g_got_code_trigger = false;
             switch (g_alexa_code) {
-                case 1:
-                    ROS_INFO("case 1:  merry_r_arm_traj.jsp");
-                    if (0 == read_traj_file("merry_r_arm_traj.jsp", des_trajectory)) {
+                case 0:
+                    ROS_INFO("case 0: ");
+                    if (0 == read_traj_file("hug.jsp", des_trajectory)) {
                         ROS_INFO("read file OK");
                         g_got_good_traj = true;}
                     else ROS_ERROR("could not read file");
                     break;
-                case 2:
-                    ROS_INFO("case 2: ");
-                    if (0 == read_traj_file("merry_r_arm_traj2.jsp", des_trajectory))
-                    g_got_good_traj = true;
+                case 1:
+                    ROS_INFO("case 1: ");
+                    if (0 == read_traj_file("wave.jsp", des_trajectory))
+                    	g_got_good_traj = true;
                     break;
+                case 2:
+                	ROS_INFO("case 2: ");
+                	if (0 == read_traj_file("shake.jsp", des_trajectory))
+                		g_got_good_traj = true;
+                	break;
+                case 3:
+                	ROS_INFO("case 3: ");
+                	if (0 == read_traj_file("scratch_head.jsp", des_trajectory))
+                		g_got_good_traj = true;
+                	break;
+                case 4:
+                	ROS_INFO("case 4: ");
+                	if (0 == read_traj_file("shy.jsp", des_trajectory))
+                		g_got_good_traj = true;
+                	break;
+                case 5:
+                	ROS_INFO("case 5: ");
+                	if (0 == read_traj_file("stick_em_up.jsp", des_trajectory))
+                		g_got_good_traj = true;
+                	break;
+                case 6:
+                	ROS_INFO("case 6: ");
+                	if (0 == read_traj_file("beauty_queen_wave.jsp", des_trajectory))
+                		g_got_good_traj = true;
+                	break;
                 default:
                     ROS_INFO("unknown case");
                     break;
