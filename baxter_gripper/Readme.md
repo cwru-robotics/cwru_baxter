@@ -53,4 +53,10 @@ rostopic pub gripper_cmd std_msgs/Bool 0
 
 rostopic pub gripper_cmd std_msgs/Bool 1
 
+REVISITED 4/16/16:
+`rosrun baxter_gripper orig_dynamixel_motor_node`
+then publish:
+`rostopic pub gripper_open_close std_msgs/Bool 0`  (for open; 1 for close)
+
+
 
