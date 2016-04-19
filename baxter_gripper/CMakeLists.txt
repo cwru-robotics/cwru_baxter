@@ -18,6 +18,8 @@ catkin_simple()
 
 cs_add_executable(dynamixel_motor_node src/dynamixel_motor_node.cpp src/dxl_c_files/ReadWrite.c src/dxl_c_files/dynamixel.c src/dxl_c_files/dxl_hal.c)
 
+cs_add_executable(orig_dynamixel_motor_node src/orig_dynamixel_motor_node.cpp src/dxl_c_files/ReadWrite.c src/dxl_c_files/dynamixel.c src/dxl_c_files/dxl_hal.c)
+
 cs_add_executable(baxter_gripper_test src/baxter_gripper_test.cpp )
 cs_add_executable(baxter_compliant_gripper src/baxter_compliant_gripper.cpp )
 
